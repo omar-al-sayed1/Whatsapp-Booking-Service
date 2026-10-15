@@ -102,6 +102,10 @@ tr:last-child td, tr:last-child th { border-block-end: 0; }
 .chip-CANCELLED { background: #eceff4; color: var(--muted); }
 .chip-patient-cancelled { background: #fbe9e7; color: var(--danger); font-weight: 600; }
 
+/* Operator: a generated password, shown once */
+.password-once { border-color: var(--accent); }
+.password-once .secret { font-family: ui-monospace, Consolas, monospace; font-size: 1.3rem; letter-spacing: .05em; user-select: all; }
+
 /* Week grid */
 .tabs { display: flex; flex-wrap: wrap; gap: .3rem; margin-block-end: var(--space); }
 .tabs a { padding: .35rem .7rem; border: 1px solid var(--line); border-radius: var(--radius); text-decoration: none;

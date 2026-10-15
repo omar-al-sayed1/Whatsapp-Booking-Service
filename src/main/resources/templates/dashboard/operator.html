@@ -1,10 +1,52 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'operator', ~{::main})}">
-<head><title th:text="#{operator.title}">Operator</title></head>
+<head><title th:text="#{operator.clinics}">Clinics</title></head>
 <body>
-<main class="container narrow">
-    <h1 th:text="#{operator.title}">Operator</h1>
-    <p class="muted" th:text="#{operator.placeholder}">Operator pages arrive in a later version.</p>
+<main class="container">
+    <h1 th:text="#{operator.clinics}">Clinics</h1>
+
+    <p class="muted" th:if="${clinics.isEmpty()}" th:text="#{operator.clinics.none}">No clinics yet.</p>
+    <table class="list card" th:unless="${clinics.isEmpty()}">
+        <thead>
+        <tr>
+            <th th:text="#{operator.clinic.name}">Name</th>
+            <th th:text="#{operator.clinic.timezone}">Timezone</th>
+            <th th:text="#{operator.clinic.language}">Patients' language</th>
+            <th th:text="#{operator.whatsapp}">WhatsApp</th>
+            <th th:text="#{operator.logins}">Logins</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="c : ${clinics}">
+            <td><strong th:text="${c.name()}">Dr. Demo</strong></td>
+            <td class="muted" dir="ltr" th:text="${c.timezone()}">Asia/Beirut</td>
+            <td class="muted" th:text="#{'language.' + ${c.language()}}">Arabic</td>
+            <td><span class="chip" th:classappend="${c.connected()} ? 'chip-CONFIRMED' : 'chip-CANCELLED'"
+                      th:text="${c.connected()} ? #{operator.connected.yes} : #{operator.connected.no}">Connected</span></td>
+            <td class="muted" th:text="${c.logins()}">2</td>
+            <td class="actions"><a class="button" th:href="@{/operator/clinics/{id}(id=${c.id()})}"
+                                   th:text="#{operator.clinic.open}">Open</a></td>
+        </tr>
+        </tbody>
+    </table>
+
+    <section class="card">
+        <h2 th:text="#{operator.clinic.add}">Add a clinic</h2>
+        <form method="post" th:action="@{/operator/clinics}" class="row">
+            <label><span th:text="#{operator.clinic.name}">Name</span>
+                <input type="text" name="name" maxlength="100" required></label>
+            <label><span th:text="#{operator.clinic.timezone}">Timezone</span>
+                <input type="text" name="timezone" th:value="${defaultZone}" dir="ltr" required></label>
+            <label><span th:text="#{operator.clinic.language}">Patients' language</span>
+                <select name="defaultLanguage">
+                    <option value="ar" th:text="#{language.ar}">Arabic</option>
+                    <option value="en" th:text="#{language.en}">English</option>
+                </select>
+            </label>
+            <button type="submit" class="primary" th:text="#{action.add}">Add</button>
+        </form>
+    </section>
 </main>
 </body>
 </html>

@@ -64,6 +64,16 @@ public class StaffUser {
         return new StaffUser(clinicId, username, passwordHash, role, language);
     }
 
+    /** A new password, already hashed by the caller. */
+    public void changePasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    /** A disabled login can't sign in; its history stays. */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
     /** The dashboard's language for this user. */
     public void changeLanguage(Language language) {
         this.language = language;

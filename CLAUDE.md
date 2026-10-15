@@ -35,8 +35,16 @@ If a library isn't compatible with Spring Boot 4 yet, tell me before downgrading
 - Run all tests: `./mvnw verify` (needs Docker: `*IT` classes use Testcontainers)
 - Unit tests only, no Docker: `./mvnw test` (`*Test` classes)
 - Health check: `http://localhost:8080/actuator/health`
-- Dashboard: `http://localhost:8080/`. Dev profile logins: `owner` / `dev` and `secretary` / `dev`
-  (created by `DevDataInitializer`, dev profile only)
+- Dashboard: `http://localhost:8080/`. Dev profile logins: `owner` / `dev`, `secretary` / `dev` and
+  `operator` / `dev` (created by `DevDataInitializer`, dev profile only)
+- Operator pages (onboarding clinics): `http://localhost:8080/operator`
+- First operator login on a new server: `java -jar app.jar --create-operator=<username>` (locally:
+  `./mvnw spring-boot:run -Dspring-boot.run.arguments=--create-operator=<username>`). Prints a
+  generated password once and exits; running it again gives that operator a new password.
+- Demo clinic for sales demos: add `--seed-demo` the same way (with the dev profile locally, e.g.
+  `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev -Dspring-boot.run.arguments=--seed-demo`).
+  Creates or refreshes "Dr. Demo" around today, prints the `drdemo` login and exits. Commands run on a
+  random port without schedulers, so they work while the app is running.
 - WhatsApp simulator (dev profile only): `http://localhost:8080/dev/whatsapp`
 - Webhook URL to register with Meta: `{APP_BASE_URL}/webhooks/whatsapp` (verify token = `WA_VERIFY_TOKEN`)
 - On Windows use `mvnw.cmd` from cmd/PowerShell, or `./mvnw` from Git Bash; `JAVA_HOME` must point to

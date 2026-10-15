@@ -42,6 +42,11 @@ public class TokenCipher {
         this.key = new SecretKeySpec(bytes, "AES");
     }
 
+    /** False without TOKEN_ENCRYPTION_KEY: tokens can then be neither stored nor used. */
+    public boolean isConfigured() {
+        return key != null;
+    }
+
     public byte[] encrypt(long clinicId, String token) {
         byte[] nonce = new byte[NONCE_BYTES];
         random.nextBytes(nonce);

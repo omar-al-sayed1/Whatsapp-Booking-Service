@@ -7,6 +7,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class ClinicRemindersApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(ClinicRemindersApplication.class, args);
+        SpringApplication.run(ClinicRemindersApplication.class, Commands.commandLine(args));
     }
 }

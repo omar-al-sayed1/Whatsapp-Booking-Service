@@ -12,8 +12,9 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-/** Login page, the language switch and the operators' placeholder. */
+/** Login page, the language switch and changing one's own password, for every role. */
 @Controller
 class AccountController {
 
@@ -41,9 +42,7 @@ class AccountController {
     String language(@RequestParam String lang, @AuthenticationPrincipal StaffPrincipal staff, HttpServletRequest request) {
         Language language = lang.equals("en") ? Language.EN : Language.AR;
         StaffLocaleResolver.remember(request, language);
-        if (staff.clinicId() != null) {
-            accounts.changeLanguage(staff, language);
-        }
+        accounts.changeLanguage(staff, language);
         return "redirect:" + samePagePath(request.getHeader("Referer"));
     }
 
@@ -64,8 +63,20 @@ class AccountController {
         }
     }
 
-    @GetMapping("/operator")
-    String operator() {
-        return "dashboard/operator";
+    @GetMapping("/account/password")
+    String password() {
+        return "dashboard/password";
+    }
+
+    @PostMapping("/account/password")
+    String changePassword(@AuthenticationPrincipal StaffPrincipal staff, RedirectAttributes redirect,
+                          @RequestParam(defaultValue = "") String currentPassword,
+                          @RequestParam(defaultValue = "") String newPassword) {
+        switch (accounts.changeOwnPassword(staff, currentPassword, newPassword)) {
+            case CHANGED -> redirect.addFlashAttribute("notice", "notice.password-changed");
+            case WRONG_CURRENT_PASSWORD -> redirect.addFlashAttribute("error", "error.password-wrong");
+            case TOO_SHORT -> redirect.addFlashAttribute("error", "error.password-short");
+        }
+        return "redirect:/account/password";
     }
 }

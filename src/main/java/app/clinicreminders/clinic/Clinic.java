@@ -85,6 +85,29 @@ public class Clinic {
         this.waAccessTokenEncrypted = encryptedAccessToken;
     }
 
+    /**
+     * The operator's edit of the WhatsApp ids; blank ones are cleared. The token is kept: see
+     * {@link #changeAccessToken}.
+     */
+    public void changeWhatsAppIds(@Nullable String phoneNumberId, @Nullable String businessAccountId) {
+        this.waPhoneNumberId = phoneNumberId;
+        this.waBusinessAccountId = businessAccountId;
+    }
+
+    /** Encrypted with {@code TokenCipher} for this clinic's id; null removes the token. */
+    public void changeAccessToken(byte @Nullable [] encryptedAccessToken) {
+        this.waAccessTokenEncrypted = encryptedAccessToken;
+    }
+
+    public void rename(String name) {
+        this.name = name;
+    }
+
+    /** Stored times stay as they are; they are shown and scheduled in the new zone from now on. */
+    public void changeTimezone(ZoneId timezone) {
+        this.timezone = timezone;
+    }
+
     /** Applies to reminders planned from now on; already planned ones are re-checked when due. */
     public void configureReminders(boolean h24Enabled, boolean h2Enabled) {
         this.reminderH24Enabled = h24Enabled;

@@ -20,7 +20,7 @@ import org.springframework.security.web.authentication.SavedRequestAwareAuthenti
 
 /**
  * Form login for the dashboard. Clinic staff (OWNER, SECRETARY) get the dashboard; operators get
- * {@code /operator} (M8). The WhatsApp webhook and the dev simulator stay open: the webhook is
+ * {@code /operator}; everyone can change their own password. The WhatsApp webhook and the dev simulator stay open: the webhook is
  * authenticated by its signature, and the simulator only exists with the fake client.
  */
 @Configuration(proxyBeanMethods = false)
@@ -35,7 +35,7 @@ class SecurityConfig {
                         .requestMatchers("/webhooks/whatsapp").permitAll()
                         .requestMatchers("/dev/whatsapp", "/dev/whatsapp/**").permitAll()
                         .requestMatchers("/operator", "/operator/**").hasRole(StaffRole.OPERATOR.name())
-                        .requestMatchers("/").authenticated()
+                        .requestMatchers("/", "/language", "/account/**").authenticated()
                         .anyRequest().hasAnyRole(StaffRole.OWNER.name(), StaffRole.SECRETARY.name()))
                 .formLogin(form -> form
                         .loginPage("/login")

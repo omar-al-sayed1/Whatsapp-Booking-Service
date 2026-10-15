@@ -126,6 +126,36 @@ class CloudApiWhatsAppClientTest {
     }
 
     @Test
+    void subscribesOurAppToABusinessAccount() {
+        server.expect(requestTo("https://graph.example/v26.0/102290129340398/subscribed_apps"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("Authorization", "Bearer EAAG-token"))
+                .andRespond(withSuccess("{\"success\":true}", MediaType.APPLICATION_JSON));
+
+        client.subscribeApp("102290129340398", "EAAG-token");
+
+        server.verify();
+    }
+
+    @Test
+    void aSubscriptionMetaRefusesOrDoesNotConfirmFails() {
+        server.expect(requestTo("https://graph.example/v26.0/102290129340398/subscribed_apps"))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\":{\"message\":\"(#200) Permissions error\",\"type\":\"OAuthException\",\"code\":200}}"));
+        assertThatThrownBy(() -> client.subscribeApp("102290129340398", "EAAG-token"))
+                .isInstanceOfSatisfying(WhatsAppException.class, e -> {
+                    assertThat(e.getCode()).isEqualTo(200);
+                    assertThat(e.isRetryable()).isFalse();
+                });
+
+        server.reset();
+        server.expect(requestTo("https://graph.example/v26.0/102290129340398/subscribed_apps"))
+                .andRespond(withSuccess("{\"success\":false}", MediaType.APPLICATION_JSON));
+        assertThatThrownBy(() -> client.subscribeApp("102290129340398", "EAAG-token"))
+                .isInstanceOf(WhatsAppException.class);
+    }
+
+    @Test
     void metaRejectionsThatShouldNotBeRetried() {
         server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.BAD_REQUEST)
                 .contentType(MediaType.APPLICATION_JSON)

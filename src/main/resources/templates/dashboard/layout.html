@@ -21,12 +21,16 @@
         <a th:href="@{/attention}" th:classappend="${active == 'attention'} ? 'active'" th:text="#{nav.attention}">Needs attention</a>
         <a th:href="@{/settings}" th:classappend="${active == 'settings'} ? 'active'" th:text="#{nav.settings}">Settings</a>
     </nav>
+    <nav class="nav" th:if="${staff.clinicId() == null}">
+        <a th:href="@{/operator}" th:classappend="${active == 'operator'} ? 'active'" th:text="#{nav.clinics}">Clinics</a>
+    </nav>
     <div class="account">
         <form method="post" th:action="@{/language}" class="inline">
             <input type="hidden" name="lang" th:value="${otherLang}">
             <button type="submit" class="link" th:lang="${otherLang}" th:text="#{'language.switch.' + ${otherLang}}">English</button>
         </form>
         <span class="muted" th:text="${staff.username}">user</span>
+        <a th:href="@{/account/password}" th:classappend="${active == 'password'} ? 'active'" th:text="#{nav.password}">Password</a>
         <form method="post" th:action="@{/logout}" class="inline">
             <button type="submit" class="link" th:text="#{nav.logout}">Log out</button>
         </form>

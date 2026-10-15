@@ -39,7 +39,9 @@ public class WhatsAppMessenger {
 
     public enum Result { SENT, FAILED, OPTED_OUT }
 
-    public record SendOutcome(Result result, @Nullable String waMessageId, @Nullable Long messageLogId) {
+    /** @param errorCode and {@code errorTitle}: Meta's error for a failed send (the code is null for network errors) */
+    public record SendOutcome(Result result, @Nullable String waMessageId, @Nullable Long messageLogId,
+                              @Nullable Integer errorCode, @Nullable String errorTitle) {
     }
 
     private final WhatsAppClient client;
@@ -71,7 +73,7 @@ public class WhatsAppMessenger {
         Clinic clinic = clinics.findById(clinicId).orElseThrow(() -> new NotFoundException("Clinic", clinicId));
         if (patients.findByClinicIdAndPhoneE164(clinicId, message.to()).filter(Patient::isOptedOut).isPresent()) {
             log.info("Not messaging an opted-out patient of clinic {}", clinicId);
-            return new SendOutcome(Result.OPTED_OUT, null, null);
+            return new SendOutcome(Result.OPTED_OUT, null, null, null, null);
         }
         MessageKind kind = kindOf(message);
         String templateName = message instanceof TemplateMessage template ? template.name() : null;
@@ -81,12 +83,12 @@ public class WhatsAppMessenger {
             BigDecimal cost = costs.estimate(message.to(), category, LocalDate.now(clock));
             MessageLog sent = logs.save(MessageLog.sent(clinicId, appointmentId, kind, templateName, waMessageId,
                     category, cost));
-            return new SendOutcome(Result.SENT, waMessageId, sent.getId());
+            return new SendOutcome(Result.SENT, waMessageId, sent.getId(), null, null);
         } catch (WhatsAppException e) {
             log.warn("WhatsApp send for clinic {} failed: {}", clinicId, e.getMessage());
             MessageLog failed = logs.save(MessageLog.failed(clinicId, appointmentId, kind, templateName,
                     e.getCode(), e.getTitle()));
-            return new SendOutcome(Result.FAILED, null, failed.getId());
+            return new SendOutcome(Result.FAILED, null, failed.getId(), e.getCode(), e.getTitle());
         }
     }
 

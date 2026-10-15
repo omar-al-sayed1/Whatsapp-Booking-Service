@@ -28,6 +28,7 @@ public class FakeWhatsAppClient implements WhatsAppClient {
 
     private final Deque<SentMessage> sent = new ConcurrentLinkedDeque<>();
     private final Queue<WhatsAppException> failures = new ConcurrentLinkedQueue<>();
+    private final Queue<String> subscribedAccounts = new ConcurrentLinkedQueue<>();
     private final Clock clock;
 
     public FakeWhatsAppClient(Clock clock) {
@@ -50,6 +51,22 @@ public class FakeWhatsAppClient implements WhatsAppClient {
         return id;
     }
 
+    /** Fails like a send when {@link #failNext} queued a failure. */
+    @Override
+    public void subscribeApp(String businessAccountId, String accessToken) {
+        WhatsAppException failure = failures.poll();
+        if (failure != null) {
+            throw failure;
+        }
+        subscribedAccounts.add(businessAccountId);
+        log.info("Fake WhatsApp: subscribed to account {}", businessAccountId);
+    }
+
+    /** Business account ids subscribed so far, oldest first. */
+    public List<String> subscribedAccounts() {
+        return List.copyOf(subscribedAccounts);
+    }
+
     /** Newest first. */
     public List<SentMessage> recent() {
         return List.copyOf(sent);
@@ -67,5 +84,6 @@ public class FakeWhatsAppClient implements WhatsAppClient {
     public void reset() {
         sent.clear();
         failures.clear();
+        subscribedAccounts.clear();
     }
 }

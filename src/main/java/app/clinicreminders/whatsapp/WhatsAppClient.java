@@ -12,4 +12,12 @@ public interface WhatsAppClient {
      * @throws WhatsAppException if Meta rejected the message or couldn't be reached
      */
     String send(WhatsAppAccount account, OutboundMessage message);
+
+    /**
+     * Subscribes our Meta app to a clinic's WhatsApp Business Account, so Meta sends the webhooks of
+     * its phone numbers to us. Needed once per account during onboarding.
+     *
+     * @throws WhatsAppException if Meta refused (e.g. the token lacks whatsapp_business_management)
+     */
+    void subscribeApp(String businessAccountId, String accessToken);
 }

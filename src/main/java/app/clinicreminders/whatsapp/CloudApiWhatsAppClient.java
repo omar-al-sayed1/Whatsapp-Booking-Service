@@ -22,7 +22,9 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Sends through Meta's Cloud API: {@code POST /{version}/{phone-number-id}/messages} with the
  * clinic's bearer token. Request and response shapes follow Meta's "Send messages", "Templates
- * overview" and "Interactive reply buttons" references; errors follow the Cloud API error codes page.
+ * overview", "Interactive reply buttons" and "Interactive list messages" references; errors follow
+ * the Cloud API error codes page. Subscribing an account follows "Get started as a Solution Partner"
+ * (step 3, {@code POST /{version}/{waba-id}/subscribed_apps}).
  * Never logs the access token or message content.
  */
 public class CloudApiWhatsAppClient implements WhatsAppClient {
@@ -63,6 +65,26 @@ public class CloudApiWhatsAppClient implements WhatsAppClient {
             throw new WhatsAppException(null, "The Cloud API response had no message id", false);
         }
         return id;
+    }
+
+    @Override
+    public void subscribeApp(String businessAccountId, String accessToken) {
+        JsonNode response;
+        try {
+            response = restClient.post()
+                    .uri("/{version}/{wabaId}/subscribed_apps", graphVersion, businessAccountId)
+                    .headers(headers -> headers.setBearerAuth(accessToken))
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, (request, errorResponse) -> {
+                        throw errorFrom(errorResponse.getStatusCode(), errorResponse.getBody().readAllBytes());
+                    })
+                    .body(JsonNode.class);
+        } catch (ResourceAccessException e) {
+            throw new WhatsAppException(null, "Could not reach the WhatsApp Cloud API: " + e.getMessage(), true);
+        }
+        if (response == null || !(response.path("success").isBoolean() && response.path("success").booleanValue())) {
+            throw new WhatsAppException(null, "Meta did not confirm the subscription", false);
+        }
     }
 
     static Map<String, Object> requestBody(OutboundMessage message) {
@@ -131,7 +153,7 @@ public class CloudApiWhatsAppClient implements WhatsAppClient {
             JsonNode error = JSON.readTree(responseBody).path("error");
             code = error.path("code").isInt() ? error.path("code").intValue() : null;
             title = text(error.path("message"));
-            log.warn("Cloud API rejected a message: HTTP {}, code {}, details: {}",
+            log.warn("Cloud API rejected a request: HTTP {}, code {}, details: {}",
                     status.value(), code, text(error.path("error_data").path("details")));
         } catch (JacksonException e) {
             log.warn("Cloud API returned HTTP {} with an unreadable body", status.value());

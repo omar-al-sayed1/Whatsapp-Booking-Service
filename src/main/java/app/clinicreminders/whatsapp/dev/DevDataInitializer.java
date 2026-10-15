@@ -27,8 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Dev profile only: makes sure there is a clinic connected to the fake WhatsApp number, with a
- * doctor, a patient and two logins ({@code owner} and {@code secretary}, password {@code dev}), so
- * the dashboard and the simulator work on an empty database. M8's demo seed replaces this.
+ * doctor, a patient and two logins ({@code owner} and {@code secretary}, password {@code dev}), plus
+ * an {@code operator} login (password {@code dev}), so the dashboard, the operator pages and the
+ * simulator work on an empty database. For sales demos use {@code --seed-demo} instead.
  */
 @Component
 @Profile("dev")
@@ -63,6 +64,10 @@ class DevDataInitializer implements ApplicationRunner {
         Clinic clinic = clinics.findByWaPhoneNumberId(DEV_PHONE_NUMBER_ID).orElseGet(this::createClinic);
         ensureUser(clinic, "owner", StaffRole.OWNER);
         ensureUser(clinic, "secretary", StaffRole.SECRETARY);
+        if (users.findByUsernameIgnoreCase("operator").isEmpty()) {
+            users.save(StaffUser.operator("operator", passwordEncoder.encode(DEV_PASSWORD), Language.EN));
+            log.info("Created dev login 'operator' (password '{}')", DEV_PASSWORD);
+        }
     }
 
     private Clinic createClinic() {

@@ -17,5 +17,8 @@ public interface ClinicRepository extends Repository<Clinic, Long> {
     @CrossTenant("Dev simulator page: lists every clinic that can receive simulated messages")
     List<Clinic> findByWaPhoneNumberIdNotNullOrderByName();
 
+    @CrossTenant("Operator area: the operator runs every clinic")
+    List<Clinic> findAllByOrderByNameAscIdAsc();
+
     Clinic save(Clinic clinic);
 }

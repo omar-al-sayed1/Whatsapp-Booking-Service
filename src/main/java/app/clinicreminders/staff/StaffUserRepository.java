@@ -1,5 +1,6 @@
 package app.clinicreminders.staff;
 
+import java.util.List;
 import java.util.Optional;
 
 import app.clinicreminders.common.CrossTenant;
@@ -12,6 +13,14 @@ public interface StaffUserRepository extends Repository<StaffUser, Long> {
     Optional<StaffUser> findByUsernameIgnoreCase(String username);
 
     Optional<StaffUser> findByIdAndClinicId(Long id, Long clinicId);
+
+    /** An operator's own account (operators belong to no clinic). */
+    @CrossTenant("Operators have no clinic; only ever called with the logged-in operator's own id")
+    Optional<StaffUser> findByIdAndClinicIdIsNull(Long id);
+
+    List<StaffUser> findByClinicIdOrderByUsername(Long clinicId);
+
+    long countByClinicId(Long clinicId);
 
     StaffUser save(StaffUser user);
 }
