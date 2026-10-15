@@ -57,11 +57,11 @@ public class ReminderMessages {
     }
 
     private String date(ZonedDateTime time, Language language) {
-        return format(time, "reminder.date-format", language.locale());
+        return format(time, "patient.date-format", language.locale());
     }
 
     private String time(ZonedDateTime time, Language language) {
-        return format(time, "reminder.time-format", language.locale());
+        return format(time, "patient.time-format", language.locale());
     }
 
     private String format(ZonedDateTime time, String patternKey, Locale locale) {

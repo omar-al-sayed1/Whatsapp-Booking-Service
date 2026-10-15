@@ -16,7 +16,7 @@ import org.hibernate.type.SqlTypes;
 
 /**
  * One live booking conversation per clinic and phone number. Keyed by phone rather than patient,
- * because a conversation can start before the patient exists. Mapping only; the flow arrives in M5.
+ * because a conversation can start before the patient exists. {@link BookingFlow} drives it.
  */
 @Entity
 @Table(name = "conversation")
@@ -59,9 +59,21 @@ public class Conversation {
         this.expiresAt = expiresAt;
     }
 
-    /** Flags the conversation for the secretary (M5: unrecognised text). */
+    /** Flags the conversation for the secretary: shown under Needs attention until handled. */
     public void flagForHuman() {
         this.needsHuman = true;
+    }
+
+    /** After 30 minutes without a message, the next one starts again at the menu (SPEC section 5.2). */
+    public boolean isExpired(Instant now) {
+        return !expiresAt.isAfter(now);
+    }
+
+    /** Moves to the next step; every message from the patient extends the session. */
+    public void moveTo(ConversationState state, String contextJson, Instant expiresAt) {
+        this.state = state;
+        this.contextJson = contextJson;
+        this.expiresAt = expiresAt;
     }
 
     /** The secretary has dealt with it (e.g. called the patient back). */

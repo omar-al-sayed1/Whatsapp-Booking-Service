@@ -12,6 +12,7 @@ import app.clinicreminders.common.NotFoundException;
 import app.clinicreminders.common.Sleeper;
 import app.clinicreminders.patient.Patient;
 import app.clinicreminders.patient.PatientRepository;
+import app.clinicreminders.whatsapp.OutboundMessage.ListMessage;
 import app.clinicreminders.whatsapp.OutboundMessage.ReplyButtonsMessage;
 import app.clinicreminders.whatsapp.OutboundMessage.TemplateMessage;
 import app.clinicreminders.whatsapp.OutboundMessage.TextMessage;
@@ -122,6 +123,7 @@ public class WhatsAppMessenger {
             case TemplateMessage template -> MessageKind.TEMPLATE;
             case TextMessage text -> MessageKind.TEXT;
             case ReplyButtonsMessage buttons -> MessageKind.INTERACTIVE;
+            case ListMessage list -> MessageKind.INTERACTIVE;
         };
     }
 }

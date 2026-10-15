@@ -21,6 +21,9 @@ public class Clinic {
 
     public static final ZoneId DEFAULT_ZONE = ZoneId.of("Asia/Beirut");
 
+    /** Address and hours each; keeps the Info reply well inside WhatsApp's 4096-character text limit. */
+    public static final int CONTACT_TEXT_MAX = 500;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -86,6 +89,29 @@ public class Clinic {
     public void configureReminders(boolean h24Enabled, boolean h2Enabled) {
         this.reminderH24Enabled = h24Enabled;
         this.reminderH2Enabled = h2Enabled;
+    }
+
+    /**
+     * What patients get when they tap Info on WhatsApp. Blank clears a field.
+     *
+     * @throws IllegalArgumentException if either is longer than {@value #CONTACT_TEXT_MAX} characters
+     */
+    public void changeContactDetails(@Nullable String address, @Nullable String hoursText) {
+        String newAddress = contactText(address);
+        String newHours = contactText(hoursText);
+        this.address = newAddress;
+        this.hoursText = newHours;
+    }
+
+    private static @Nullable String contactText(@Nullable String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String stripped = value.strip();
+        if (stripped.length() > CONTACT_TEXT_MAX) {
+            throw new IllegalArgumentException("At most " + CONTACT_TEXT_MAX + " characters");
+        }
+        return stripped;
     }
 
     /** The language new patients get until they choose. */

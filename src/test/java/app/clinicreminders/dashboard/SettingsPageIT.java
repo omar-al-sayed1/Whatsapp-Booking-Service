@@ -53,6 +53,34 @@ class SettingsPageIT extends DashboardTest {
     }
 
     @Test
+    void savesTheAddressAndHoursPatientsGetFromInfo() {
+        post(staff, "/settings/clinic").param("defaultLanguage", "ar")
+                .param("address", "  شارع البرازيل، زحلة ").param("hoursText", "Mon-Sat 9-1").exchange();
+
+        Clinic saved = clinics.findById(clinic.getId()).orElseThrow();
+        assertThat(saved.getAddress()).isEqualTo("شارع البرازيل، زحلة");
+        assertThat(saved.getHoursText()).isEqualTo("Mon-Sat 9-1");
+        assertThat(get(staff, "/settings")).bodyText().contains("شارع البرازيل، زحلة", "Mon-Sat 9-1");
+
+        post(staff, "/settings/clinic").param("defaultLanguage", "ar").param("address", " ").exchange();
+
+        Clinic cleared = clinics.findById(clinic.getId()).orElseThrow();
+        assertThat(cleared.getAddress()).isNull();
+        assertThat(cleared.getHoursText()).isNull();
+    }
+
+    @Test
+    void tooLongAContactTextSavesNothing() {
+        assertThat(post(staff, "/settings/clinic").param("defaultLanguage", "en").param("h24Enabled", "true")
+                .param("address", "x".repeat(Clinic.CONTACT_TEXT_MAX + 1)))
+                .flash().containsEntry("error", "error.contact");
+
+        Clinic unchanged = clinics.findById(clinic.getId()).orElseThrow();
+        assertThat(unchanged.getAddress()).isNull();
+        assertThat(unchanged.getDefaultLanguage()).isEqualTo(Language.AR);
+    }
+
+    @Test
     void addsAndEditsDoctors() {
         assertThat(post(staff, "/settings/doctors").param("displayName", "Dr. Saab").param("slotMinutes", "20"))
                 .hasStatus3xxRedirection();

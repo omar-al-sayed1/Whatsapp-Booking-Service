@@ -57,9 +57,9 @@ a { color: var(--accent); }
 /* Forms */
 label { display: flex; flex-direction: column; gap: .25rem; }
 label.check { flex-direction: row; align-items: center; gap: .5rem; }
-input, select, button, .button { font: inherit; }
+input, select, textarea, button, .button { font: inherit; }
 input[type=text], input[type=tel], input[type=search], input[type=password], input[type=date], input[type=time],
-input[type=number], select {
+input[type=number], select, textarea {
     padding: .45rem .6rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface);
     min-width: 0;
 }

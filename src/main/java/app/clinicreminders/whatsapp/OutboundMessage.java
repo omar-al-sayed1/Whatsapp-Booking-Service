@@ -4,10 +4,11 @@ import java.util.HashSet;
 import java.util.List;
 
 import app.clinicreminders.common.PhoneNumbers;
+import org.jspecify.annotations.Nullable;
 
 /**
- * A message we send. Limits are Meta's, from the interactive reply buttons reference
- * (developers.facebook.com/documentation/business-messaging/whatsapp/messages/interactive-reply-buttons-messages).
+ * A message we send. Limits are Meta's, from the interactive reply buttons and interactive list
+ * messages references (developers.facebook.com/documentation/business-messaging/whatsapp/messages/).
  */
 public sealed interface OutboundMessage {
 
@@ -51,6 +52,43 @@ public sealed interface OutboundMessage {
                 throw new IllegalArgumentException("Button titles must be unique");
             }
             buttons = List.copyOf(buttons);
+        }
+    }
+
+    /**
+     * A list the patient opens with {@code button} and picks one row from. One section, as every
+     * list we send has one; Meta requires its title even then. Only allowed inside the 24-hour
+     * customer service window.
+     */
+    record ListMessage(String to, String body, String button, String sectionTitle, List<ListRow> rows)
+            implements OutboundMessage {
+
+        public ListMessage {
+            PhoneNumbers.requireE164(to);
+            requireLength("Body", body, 4096);
+            requireLength("Button", button, 20);
+            requireLength("Section title", sectionTitle, 24);
+            if (rows.isEmpty() || rows.size() > 10) {
+                throw new IllegalArgumentException("Between 1 and 10 rows are allowed");
+            }
+            rows = List.copyOf(rows);
+        }
+    }
+
+    record ListRow(String id, String title, @Nullable String description) {
+
+        public ListRow {
+            requireLength("Row id", id, 200);
+            requireLength("Row title", title, 24);
+            if (description != null && description.length() > 72) {
+                throw new IllegalArgumentException("Row description must be at most 72 characters: " + description);
+            }
+        }
+    }
+
+    private static void requireLength(String what, String value, int max) {
+        if (value == null || value.isEmpty() || value.length() > max) {
+            throw new IllegalArgumentException(what + " must be 1-" + max + " characters: " + value);
         }
     }
 

@@ -49,6 +49,16 @@ public final class SimulatedWebhooks {
         return envelope(phoneNumberId, fromE164, profileName, message);
     }
 
+    /** A row picked from one of our list messages. */
+    public static String listReply(String phoneNumberId, String fromE164, @Nullable String profileName, String id,
+                                   String repliedToId, String rowId, String title, Instant at) {
+        ObjectNode message = message(fromE164, id, "interactive", at);
+        message.putObject("context").put("from", "dev").put("id", repliedToId);
+        ObjectNode interactive = message.putObject("interactive").put("type", "list_reply");
+        interactive.putObject("list_reply").put("id", rowId).put("title", title);
+        return envelope(phoneNumberId, fromE164, profileName, message);
+    }
+
     /**
      * A status for a message we sent.
      *

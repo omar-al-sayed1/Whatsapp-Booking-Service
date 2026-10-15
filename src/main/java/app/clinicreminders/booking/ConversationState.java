@@ -1,6 +1,6 @@
 package app.clinicreminders.booking;
 
-/** States of the WhatsApp booking flow (SPEC section 5.2). Transitions arrive in M5. */
+/** States of the WhatsApp booking flow (SPEC section 5.2); {@link BookingFlow} moves between them. */
 public enum ConversationState {
 
     MENU,

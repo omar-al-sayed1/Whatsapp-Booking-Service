@@ -14,6 +14,8 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import java.io.IOException;
 import java.util.List;
 
+import app.clinicreminders.whatsapp.OutboundMessage.ListMessage;
+import app.clinicreminders.whatsapp.OutboundMessage.ListRow;
 import app.clinicreminders.whatsapp.OutboundMessage.ReplyButton;
 import app.clinicreminders.whatsapp.OutboundMessage.ReplyButtonsMessage;
 import app.clinicreminders.whatsapp.OutboundMessage.TemplateMessage;
@@ -27,7 +29,10 @@ import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
-/** Request and response shapes from Meta's "Send messages" and "Templates overview" pages. */
+/**
+ * Request and response shapes from Meta's "Send messages", "Templates overview", "Interactive reply
+ * buttons messages" and "Interactive list messages" pages.
+ */
 class CloudApiWhatsAppClientTest {
 
     private static final String URL = "https://graph.example/v26.0/106540352242922/messages";
@@ -96,6 +101,26 @@ class CloudApiWhatsAppClientTest {
 
         client.send(ACCOUNT, new ReplyButtonsMessage("+96170123456", "Which doctor?",
                 List.of(new ReplyButton("doctor-1", "Dr. Khoury"), new ReplyButton("doctor-2", "Dr. Saab"))));
+
+        server.verify();
+    }
+
+    @Test
+    void sendsAListWithOneSectionAndLeavesOutMissingDescriptions() {
+        server.expect(requestTo(URL))
+                .andExpect(content().json("""
+                        {"messaging_product":"whatsapp","recipient_type":"individual","to":"+96170123456",
+                         "type":"interactive",
+                         "interactive":{"type":"list","body":{"text":"Pick a day."},
+                           "action":{"button":"Days","sections":[{"title":"Next free days","rows":[
+                             {"id":"day:2026-11-03","title":"Tuesday 3 November","description":"Free times: 6"},
+                             {"id":"slots:more","title":"Later times"}]}]}}}""",
+                        JsonCompareMode.STRICT))
+                .andRespond(withSuccess(SUCCESS, MediaType.APPLICATION_JSON));
+
+        client.send(ACCOUNT, new ListMessage("+96170123456", "Pick a day.", "Days", "Next free days", List.of(
+                new ListRow("day:2026-11-03", "Tuesday 3 November", "Free times: 6"),
+                new ListRow("slots:more", "Later times", null))));
 
         server.verify();
     }

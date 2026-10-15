@@ -68,6 +68,7 @@ class DevDataInitializer implements ApplicationRunner {
     private Clinic createClinic() {
         Clinic clinic = new Clinic("Dev Clinic", Clinic.DEFAULT_ZONE, Language.AR);
         clinic.connectWhatsApp(DEV_PHONE_NUMBER_ID, "dev-waba", null);
+        clinic.changeContactDetails("Main street, Zahle", "Monday to Saturday, 9:00 to 13:00");
         clinic = clinics.save(clinic);
         Doctor doctor = doctors.save(new Doctor(clinic.getId(), "Dr. Dev", 30));
         for (DayOfWeek day : DayOfWeek.values()) {

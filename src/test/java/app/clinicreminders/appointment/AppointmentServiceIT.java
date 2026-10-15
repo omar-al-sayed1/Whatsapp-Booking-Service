@@ -7,6 +7,7 @@ import static org.assertj.core.groups.Tuple.tuple;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import app.clinicreminders.IntegrationTest;
 import app.clinicreminders.appointment.AppointmentEvents.CancelledBy;
@@ -22,6 +23,7 @@ import app.clinicreminders.scheduling.Doctor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** Booking, moving and cancelling, and the reminder rows that follow (SPEC section 5.1). */
 class AppointmentServiceIT extends IntegrationTest {
@@ -40,6 +42,9 @@ class AppointmentServiceIT extends IntegrationTest {
 
     @Autowired
     ClinicRepository clinics;
+
+    @Autowired
+    TransactionTemplate transactions;
 
     private Clinic clinic;
     private Doctor doctor;
@@ -89,6 +94,35 @@ class AppointmentServiceIT extends IntegrationTest {
                 AppointmentSource.WHATSAPP)).isInstanceOf(SlotTakenException.class);
         assertThat(count("appointment")).isEqualTo(1);
         assertThat(count("reminder")).isEqualTo(2);
+    }
+
+    @Test
+    void tryBookReturnsEmptyForATakenTimeAndTheTransactionCarriesOn() {
+        Patient other = data.patient(clinic, "+96170999999");
+
+        Boolean committed = transactions.execute(status -> {
+            assertThat(tryBook(patient, TUE_1030)).isPresent();
+            assertThat(tryBook(other, TUE_1030)).isEmpty();
+            assertThat(tryBook(other, TUE_1030.plus(Duration.ofMinutes(30)))).isPresent();
+            return !status.isRollbackOnly();
+        });
+
+        assertThat(committed).isTrue();
+        assertThat(count("appointment")).isEqualTo(2);
+        assertThat(count("reminder")).as("reminders only for the two bookings").isEqualTo(4);
+    }
+
+    @Test
+    void tryBookUsesTheDoctorsSlotLengthAndStaysInItsClinic() {
+        Appointment booked = tryBook(patient, TUE_1030).orElseThrow();
+        Clinic other = data.clinic("B");
+
+        assertThat(booked.getEndsAt()).isEqualTo(TUE_1030.plus(Duration.ofMinutes(30)));
+        assertThat(booked.getSource()).isEqualTo(AppointmentSource.WHATSAPP);
+        assertThatThrownBy(() -> appointments.tryBook(other.getId(), doctor.getId(), patient.getId(), TUE_1030,
+                AppointmentSource.WHATSAPP)).isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> appointments.tryBook(clinic.getId(), doctor.getId(), data.patient(other).getId(),
+                TUE_1030.plus(Duration.ofHours(1)), AppointmentSource.WHATSAPP)).isInstanceOf(NotFoundException.class);
     }
 
     @Test
@@ -169,6 +203,10 @@ class AppointmentServiceIT extends IntegrationTest {
                 .isInstanceOf(NotFoundException.class);
         assertThatThrownBy(() -> appointments.reschedule(other.getId(), appointment.getId(), TUE_1030))
                 .isInstanceOf(NotFoundException.class);
+    }
+
+    private Optional<Appointment> tryBook(Patient who, Instant startsAt) {
+        return appointments.tryBook(clinic.getId(), doctor.getId(), who.getId(), startsAt, AppointmentSource.WHATSAPP);
     }
 
     private Appointment book(Instant startsAt) {

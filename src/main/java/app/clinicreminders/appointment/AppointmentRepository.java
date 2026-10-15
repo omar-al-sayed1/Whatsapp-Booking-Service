@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface AppointmentRepository extends Repository<Appointment, Long> {
 
@@ -36,6 +37,30 @@ public interface AppointmentRepository extends Repository<Appointment, Long> {
     List<AppointmentView> findViews(Long clinicId, Instant from, Instant to);
 
     List<Appointment> findByClinicIdAndPatientIdAndStartsAtAfter(Long clinicId, Long patientId, Instant after);
+
+    /** The patient's next active appointment ("My appointment" on WhatsApp). */
+    @Query("""
+            select a from Appointment a
+            where a.clinicId = :clinicId and a.patientId = :patientId and a.startsAt > :after
+              and a.status in (app.clinicreminders.appointment.AppointmentStatus.BOOKED,
+                               app.clinicreminders.appointment.AppointmentStatus.CONFIRMED)
+            order by a.startsAt
+            limit 1""")
+    Optional<Appointment> findNextOpen(Long clinicId, Long patientId, Instant after);
+
+    /**
+     * Books unless the doctor already has an active appointment starting then. Unlike
+     * {@link #saveAndFlush}, losing the race returns empty instead of throwing, so the caller's
+     * transaction stays usable (the WhatsApp flow runs inside the webhook inbox's transaction).
+     */
+    @Transactional
+    @Query(value = """
+            insert into appointment (clinic_id, doctor_id, patient_id, starts_at, ends_at, status, source)
+            values (:clinicId, :doctorId, :patientId, :startsAt, :endsAt, 'BOOKED', :source)
+            on conflict (doctor_id, starts_at) where status <> 'CANCELLED' do nothing
+            returning id""", nativeQuery = true)
+    Optional<Long> insertUnlessTaken(Long clinicId, Long doctorId, Long patientId, Instant startsAt, Instant endsAt,
+                                     String source);
 
     Appointment save(Appointment appointment);
 

@@ -2,14 +2,18 @@ package app.clinicreminders.whatsapp.dev;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.DayOfWeek;
 import java.util.List;
 
 import app.clinicreminders.IntegrationTest;
 import app.clinicreminders.clinic.Clinic;
+import app.clinicreminders.scheduling.Doctor;
 import app.clinicreminders.whatsapp.FakeWhatsAppClient.SentMessage;
 import app.clinicreminders.whatsapp.MessageKind;
 import app.clinicreminders.whatsapp.MessageLogRepository;
 import app.clinicreminders.whatsapp.MessageStatus;
+import app.clinicreminders.whatsapp.OutboundMessage.ListMessage;
+import app.clinicreminders.whatsapp.OutboundMessage.ListRow;
 import app.clinicreminders.whatsapp.OutboundMessage.ReplyButtonsMessage;
 import app.clinicreminders.whatsapp.OutboundMessage.TemplateMessage;
 import app.clinicreminders.whatsapp.WhatsAppMessenger;
@@ -96,6 +100,31 @@ class DevWhatsAppPageIT extends IntegrationTest {
                 .isEqualTo(MessageKind.BUTTON_REPLY.name());
         assertThat(logs.findByClinicIdAndWaMessageId(clinic.getId(), id).orElseThrow().getStatus())
                 .isEqualTo(MessageStatus.READ);
+    }
+
+    @Test
+    void theBookingMenuAndItsListsCanBeTappedThrough() {
+        Doctor doctor = data.doctor(clinic, "Dr. Dev", 30);
+        data.weekly(doctor, DayOfWeek.THURSDAY, "09:00", "10:00");
+        mvc.post().uri("/dev/whatsapp/reply")
+                .param("clinicId", clinic.getId().toString()).param("from", PATIENT).param("text", "مرحبا")
+                .exchange();
+        SentMessage menu = whatsApp.recent().getFirst();
+        assertThat(mvc.get().uri("/dev/whatsapp")).bodyText().contains("Tap حجز موعد", "Tap موعدي");
+
+        mvc.post().uri("/dev/whatsapp/tap").param("waMessageId", menu.waMessageId())
+                .param("buttonId", "menu:book").param("buttonTitle", "حجز موعد").exchange();
+        SentMessage days = whatsApp.recent().getFirst();
+        assertThat(days.message()).isInstanceOf(ListMessage.class);
+        assertThat(mvc.get().uri("/dev/whatsapp")).bodyText().contains("list [الأيام]", "Pick الخميس 15 تشرين الأول");
+
+        mvc.post().uri("/dev/whatsapp/tap").param("waMessageId", days.waMessageId())
+                .param("rowId", "day:2026-10-15").param("rowTitle", "الخميس 15 تشرين الأول").exchange();
+
+        assertThat(jdbc.queryForObject("select count(*) from message_log where direction = 'IN' and kind = 'INTERACTIVE'",
+                Integer.class)).isEqualTo(1);
+        assertThat(whatsApp.recent().getFirst().message()).isInstanceOfSatisfying(ListMessage.class,
+                times -> assertThat(times.rows()).extracting(ListRow::title).containsExactly("9:00 ص", "9:30 ص"));
     }
 
     @Test

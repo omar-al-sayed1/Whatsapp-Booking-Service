@@ -71,6 +71,9 @@ class SettingsController {
         model.addAttribute("defaultLanguage", clinic.getDefaultLanguage().code());
         model.addAttribute("h24Enabled", clinic.isReminderH24Enabled());
         model.addAttribute("h2Enabled", clinic.isReminderH2Enabled());
+        model.addAttribute("address", clinic.getAddress());
+        model.addAttribute("hoursText", clinic.getHoursText());
+        model.addAttribute("contactMax", Clinic.CONTACT_TEXT_MAX);
         model.addAttribute("doctors", doctors.findByClinicIdOrderByDisplayName(ctx.clinicId()));
         return "dashboard/settings";
     }
@@ -79,9 +82,16 @@ class SettingsController {
     String saveClinic(@AuthenticationPrincipal StaffPrincipal staff, HttpServletRequest request, RedirectAttributes redirect,
                       @RequestParam String defaultLanguage,
                       @RequestParam(defaultValue = "false") boolean h24Enabled,
-                      @RequestParam(defaultValue = "false") boolean h2Enabled) {
-        clinicSettings.update(context.of(staff, request).clinicId(), Language.fromCode(defaultLanguage), h24Enabled, h2Enabled);
-        redirect.addFlashAttribute("notice", "notice.saved");
+                      @RequestParam(defaultValue = "false") boolean h2Enabled,
+                      @RequestParam(defaultValue = "") String address,
+                      @RequestParam(defaultValue = "") String hoursText) {
+        try {
+            clinicSettings.update(context.of(staff, request).clinicId(), Language.fromCode(defaultLanguage), h24Enabled,
+                    h2Enabled, address, hoursText);
+            redirect.addFlashAttribute("notice", "notice.saved");
+        } catch (IllegalArgumentException e) {
+            redirect.addFlashAttribute("error", "error.contact");
+        }
         return "redirect:/settings";
     }
 

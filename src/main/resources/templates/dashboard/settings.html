@@ -23,6 +23,15 @@
                 <input type="checkbox" name="h2Enabled" value="true" th:checked="${h2Enabled}">
                 <span th:text="#{settings.h2}">Send a reminder 2 hours before</span>
             </label>
+            <label>
+                <span th:text="#{settings.address}">Address</span>
+                <textarea name="address" rows="2" th:maxlength="${contactMax}" th:text="${address}"></textarea>
+            </label>
+            <label>
+                <span th:text="#{settings.hours-text}">Opening hours</span>
+                <textarea name="hoursText" rows="2" th:maxlength="${contactMax}" th:text="${hoursText}"></textarea>
+            </label>
+            <p class="muted" th:text="#{settings.contact.hint}">Sent to patients who tap Info on WhatsApp.</p>
             <div class="buttons"><button type="submit" class="primary" th:text="#{action.save}">Save</button></div>
         </form>
     </section>

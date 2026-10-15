@@ -3,6 +3,7 @@ package app.clinicreminders.appointment;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Optional;
 
 import app.clinicreminders.appointment.AppointmentEvents.Cancelled;
 import app.clinicreminders.appointment.AppointmentEvents.CancelledBy;
@@ -57,6 +58,22 @@ public class AppointmentService {
         appointment = saveGuarded(appointment);
         events.publishEvent(new Scheduled(clinicId, appointment.getId()));
         return appointment;
+    }
+
+    /**
+     * Like {@link #book}, but a taken start time returns empty instead of throwing, leaving the
+     * caller's transaction usable. For the WhatsApp flow, which runs inside the webhook inbox's
+     * transaction and answers a lost race by offering the next free times.
+     */
+    public Optional<Appointment> tryBook(long clinicId, long doctorId, long patientId, Instant startsAt,
+                                         AppointmentSource source) {
+        Doctor doctor = doctors.findByIdAndClinicId(doctorId, clinicId)
+                .orElseThrow(() -> new NotFoundException("Doctor", doctorId));
+        patients.findByIdAndClinicId(patientId, clinicId).orElseThrow(() -> new NotFoundException("Patient", patientId));
+        Optional<Long> id = appointments.insertUnlessTaken(clinicId, doctorId, patientId, startsAt,
+                startsAt.plus(doctor.slotLength()), source.name());
+        id.ifPresent(appointmentId -> events.publishEvent(new Scheduled(clinicId, appointmentId)));
+        return id.flatMap(appointmentId -> appointments.findByIdAndClinicId(appointmentId, clinicId));
     }
 
     /** Moves the appointment, keeping its length. It goes back to BOOKED and gets new reminders. */

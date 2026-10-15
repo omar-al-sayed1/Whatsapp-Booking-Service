@@ -4,6 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import app.clinicreminders.whatsapp.OutboundMessage.ListMessage;
 import app.clinicreminders.whatsapp.OutboundMessage.ReplyButtonsMessage;
 import app.clinicreminders.whatsapp.OutboundMessage.TemplateMessage;
 import app.clinicreminders.whatsapp.OutboundMessage.TextMessage;
@@ -86,6 +87,26 @@ public class CloudApiWhatsAppClient implements WhatsAppClient {
             case TextMessage text -> {
                 body.put("type", "text");
                 body.put("text", Map.of("body", text.body()));
+            }
+            case ListMessage list -> {
+                body.put("type", "interactive");
+                List<Map<String, Object>> rows = list.rows().stream()
+                        .<Map<String, Object>>map(row -> {
+                            Map<String, Object> entry = new LinkedHashMap<>();
+                            entry.put("id", row.id());
+                            entry.put("title", row.title());
+                            if (row.description() != null) {
+                                entry.put("description", row.description());
+                            }
+                            return entry;
+                        })
+                        .toList();
+                body.put("interactive", Map.of(
+                        "type", "list",
+                        "body", Map.of("text", list.body()),
+                        "action", Map.of(
+                                "button", list.button(),
+                                "sections", List.of(Map.of("title", list.sectionTitle(), "rows", rows)))));
             }
             case ReplyButtonsMessage buttons -> {
                 body.put("type", "interactive");

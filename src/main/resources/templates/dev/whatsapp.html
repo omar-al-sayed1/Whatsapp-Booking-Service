@@ -100,6 +100,12 @@
                     <input type="hidden" name="buttonTitle" th:value="${b.title()}">
                     <button name="buttonId" th:value="${b.id()}" th:text="'Tap ' + ${b.title()}">Tap</button>
                 </form>
+                <form class="inline" method="post" th:action="@{/dev/whatsapp/tap}" th:each="row : ${r.listRows()}">
+                    <input type="hidden" name="waMessageId" th:value="${r.waMessageId()}">
+                    <input type="hidden" name="rowTitle" th:value="${row.title()}">
+                    <button name="rowId" th:value="${row.id()}"
+                            th:text="'Pick ' + ${row.title()} + (${row.description()} != null ? ' (' + ${row.description()} + ')' : '')">Pick</button>
+                </form>
                 <form class="inline" method="post" th:action="@{/dev/whatsapp/status}">
                     <input type="hidden" name="waMessageId" th:value="${r.waMessageId()}">
                     <button name="status" value="delivered">Delivered</button>

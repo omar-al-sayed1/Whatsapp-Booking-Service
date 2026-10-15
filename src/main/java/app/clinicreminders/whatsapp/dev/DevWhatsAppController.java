@@ -1,6 +1,7 @@
 package app.clinicreminders.whatsapp.dev;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -16,6 +17,8 @@ import app.clinicreminders.whatsapp.FakeWhatsAppClient.SentMessage;
 import app.clinicreminders.whatsapp.MessageLog;
 import app.clinicreminders.whatsapp.MessageLogRepository;
 import app.clinicreminders.whatsapp.OutboundMessage;
+import app.clinicreminders.whatsapp.OutboundMessage.ListMessage;
+import app.clinicreminders.whatsapp.OutboundMessage.ListRow;
 import app.clinicreminders.whatsapp.OutboundMessage.ReplyButton;
 import app.clinicreminders.whatsapp.OutboundMessage.ReplyButtonsMessage;
 import app.clinicreminders.whatsapp.OutboundMessage.TemplateMessage;
@@ -47,7 +50,7 @@ class DevWhatsAppController {
 
     /** One sent message as the page shows it. */
     record Row(String waMessageId, String sentAt, String clinic, String to, String kind, String content,
-               List<String> quickReplies, List<ReplyButton> buttons, String status) {
+               List<String> quickReplies, List<ReplyButton> buttons, List<ListRow> listRows, String status) {
     }
 
     private final FakeWhatsAppClient fake;
@@ -106,16 +109,23 @@ class DevWhatsAppController {
         return "redirect:/dev/whatsapp";
     }
 
+    /** Taps a template quick reply ({@code label}), a reply button ({@code buttonId}) or a list row ({@code rowId}). */
     @PostMapping("/tap")
     String tap(@RequestParam String waMessageId, @RequestParam(required = false) String label,
-               @RequestParam(required = false) String buttonId, @RequestParam(required = false) String buttonTitle) {
+               @RequestParam(required = false) String buttonId, @RequestParam(required = false) String buttonTitle,
+               @RequestParam(required = false) String rowId, @RequestParam(required = false) String rowTitle) {
         SentMessage sent = fake.find(waMessageId).orElseThrow(() -> new NotFoundException("Message", waMessageId));
         String id = SimulatedWebhooks.newMessageId();
         String to = sent.message().to();
-        deliver(buttonId != null
-                ? SimulatedWebhooks.buttonReply(sent.phoneNumberId(), to, null, id, waMessageId, buttonId, buttonTitle,
-                        clock.instant())
-                : SimulatedWebhooks.quickReply(sent.phoneNumberId(), to, null, id, waMessageId, label, clock.instant()));
+        String phoneNumberId = sent.phoneNumberId();
+        Instant now = clock.instant();
+        if (rowId != null) {
+            deliver(SimulatedWebhooks.listReply(phoneNumberId, to, null, id, waMessageId, rowId, rowTitle, now));
+        } else if (buttonId != null) {
+            deliver(SimulatedWebhooks.buttonReply(phoneNumberId, to, null, id, waMessageId, buttonId, buttonTitle, now));
+        } else {
+            deliver(SimulatedWebhooks.quickReply(phoneNumberId, to, null, id, waMessageId, label, now));
+        }
         return "redirect:/dev/whatsapp";
     }
 
@@ -155,6 +165,7 @@ class DevWhatsAppController {
         String content;
         List<String> quickReplies = List.of();
         List<ReplyButton> buttons = List.of();
+        List<ListRow> listRows = List.of();
         switch (message) {
             case TemplateMessage template -> {
                 kind = "template " + template.name() + " [" + template.languageCode() + "]";
@@ -171,9 +182,14 @@ class DevWhatsAppController {
                 content = interactive.body();
                 buttons = interactive.buttons();
             }
+            case ListMessage list -> {
+                kind = "list [" + list.button() + "]";
+                content = list.body();
+                listRows = list.rows();
+            }
         }
         return new Row(sent.waMessageId(), TIME.format(sent.sentAt().atZone(zone)),
                 clinic == null ? sent.phoneNumberId() : clinic.getName(), message.to(), kind, content,
-                quickReplies, buttons, status);
+                quickReplies, buttons, listRows, status);
     }
 }
