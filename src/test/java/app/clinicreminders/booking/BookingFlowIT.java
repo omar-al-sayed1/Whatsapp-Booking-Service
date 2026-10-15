@@ -471,6 +471,22 @@ class BookingFlowIT extends IntegrationTest {
     }
 
     @Test
+    void thanksAfterABookingIsIgnoredUntilTheSessionEnds() {
+        reachConfirmation(PHONE);
+        tap("confirm:yes");
+
+        say("شكراً");
+        assertThat(whatsApp.recent()).hasSize(5);
+        assertThat(flagged()).isFalse();
+        assertThat(state()).isEqualTo(ConversationState.DONE);
+
+        clock.setInstant(clock.instant().plus(Duration.ofMinutes(31)));
+        say("مرحبا");
+        assertThat(lastTo(PHONE)).isInstanceOfSatisfying(ReplyButtonsMessage.class,
+                menu -> assertThat(menu.body()).isEqualTo(MENU_AR));
+    }
+
+    @Test
     void voiceNotesAndPhotosCountAsTyping() {
         say("مرحبا");
 

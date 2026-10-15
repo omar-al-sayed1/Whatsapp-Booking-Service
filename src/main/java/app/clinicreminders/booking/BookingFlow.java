@@ -61,7 +61,8 @@ import org.springframework.transaction.annotation.Transactional;
  *       (the patient scrolls up and picks another day). Any other old tap re-sends the current
  *       step; after DONE old taps (a second tap on Confirm) are ignored.</li>
  *   <li>Typed text, voice notes and photos get the menu once per session and flag the
- *       conversation for the secretary; after that they get no reply.</li>
+ *       conversation for the secretary; after that they get no reply. After DONE (usually
+ *       "thanks") they are ignored until the session ends.</li>
  *   <li>Opted-out patients get no reply; their conversation is flagged. Senders whose number Meta
  *       hides are only logged, since we message by number.</li>
  *   <li>The booking itself is {@code INSERT ... ON CONFLICT DO NOTHING}: a patient who loses the
@@ -273,8 +274,14 @@ class BookingFlow {
                     null, false);
         }
 
-        /** Typed text, a voice note, a photo: the menu once per session, and the secretary is told. */
+        /**
+         * Typed text, a voice note, a photo: the menu once per session, and the secretary is told.
+         * Right after a booking or cancellation it is nearly always "thanks", so it is ignored.
+         */
         private Step unrecognised(ConversationState state, BookingContext context) {
+            if (state == ConversationState.DONE) {
+                return new Step(state, context, null, null, false);
+            }
             if (context.menuResent()) {
                 return new Step(state, context, null, null, true);
             }
