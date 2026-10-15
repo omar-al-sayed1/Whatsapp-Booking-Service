@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.jspecify.annotations.Nullable;
 
 /** Replaces a doctor's weekly hours on one date: either closed, or open with different hours. */
 @Entity
@@ -44,6 +45,13 @@ public class ScheduleException {
         this.clinicId = clinicId;
         this.doctorId = doctorId;
         this.exceptionDate = date;
+        this.closed = hours == null;
+        this.startTime = hours == null ? null : hours.start();
+        this.endTime = hours == null ? null : hours.end();
+    }
+
+    /** Closed when {@code hours} is null, otherwise open with these hours. */
+    void change(@Nullable TimeWindow hours) {
         this.closed = hours == null;
         this.startTime = hours == null ? null : hours.start();
         this.endTime = hours == null ? null : hours.end();

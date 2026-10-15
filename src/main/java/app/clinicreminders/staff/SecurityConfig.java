@@ -1,0 +1,87 @@
+package app.clinicreminders.staff;
+
+import java.io.IOException;
+
+import app.clinicreminders.dashboard.StaffLocaleResolver;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.crypto.factory.PasswordEncoderFactories;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
+
+/**
+ * Form login for the dashboard. Clinic staff (OWNER, SECRETARY) get the dashboard; operators get
+ * {@code /operator} (M8). The WhatsApp webhook and the dev simulator stay open: the webhook is
+ * authenticated by its signature, and the simulator only exists with the fake client.
+ */
+@Configuration(proxyBeanMethods = false)
+class SecurityConfig {
+
+    @Bean
+    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/login", "/css/**", "/webjars/**", "/favicon.ico", "/error").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers("/webhooks/whatsapp").permitAll()
+                        .requestMatchers("/dev/whatsapp", "/dev/whatsapp/**").permitAll()
+                        .requestMatchers("/operator", "/operator/**").hasRole(StaffRole.OPERATOR.name())
+                        .requestMatchers("/").authenticated()
+                        .anyRequest().hasAnyRole(StaffRole.OWNER.name(), StaffRole.SECRETARY.name()))
+                .formLogin(form -> form
+                        .loginPage("/login")
+                        .successHandler(new LanguageRememberingSuccessHandler())
+                        .permitAll())
+                .logout(logout -> logout.logoutSuccessUrl("/login?logout"))
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/webhooks/whatsapp", "/dev/whatsapp/**"))
+                .exceptionHandling(errors -> errors.authenticationEntryPoint(new HtmxAwareEntryPoint()));
+        return http.build();
+    }
+
+    @Bean
+    PasswordEncoder passwordEncoder() {
+        return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+    }
+
+    /** Starts the session in the user's saved language, then continues to the page they asked for. */
+    private static final class LanguageRememberingSuccessHandler extends SavedRequestAwareAuthenticationSuccessHandler {
+
+        @Override
+        public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
+                                            Authentication authentication) throws IOException, ServletException {
+            if (authentication.getPrincipal() instanceof StaffPrincipal staff) {
+                StaffLocaleResolver.remember(request, staff.language());
+            }
+            super.onAuthenticationSuccess(request, response, authentication);
+        }
+    }
+
+    /**
+     * htmx requests (the 30-second refresh) can't follow a redirect to the login page in place, so
+     * they get 401 with {@code HX-Redirect}, which makes htmx load the login page as a whole page.
+     */
+    private static final class HtmxAwareEntryPoint implements AuthenticationEntryPoint {
+
+        private final LoginUrlAuthenticationEntryPoint login = new LoginUrlAuthenticationEntryPoint("/login");
+
+        @Override
+        public void commence(HttpServletRequest request, HttpServletResponse response,
+                             AuthenticationException exception) throws IOException, ServletException {
+            if ("true".equals(request.getHeader("HX-Request"))) {
+                response.setHeader("HX-Redirect", request.getContextPath() + "/login");
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                return;
+            }
+            login.commence(request, response, exception);
+        }
+    }
+}

@@ -35,6 +35,8 @@ If a library isn't compatible with Spring Boot 4 yet, tell me before downgrading
 - Run all tests: `./mvnw verify` (needs Docker: `*IT` classes use Testcontainers)
 - Unit tests only, no Docker: `./mvnw test` (`*Test` classes)
 - Health check: `http://localhost:8080/actuator/health`
+- Dashboard: `http://localhost:8080/`. Dev profile logins: `owner` / `dev` and `secretary` / `dev`
+  (created by `DevDataInitializer`, dev profile only)
 - WhatsApp simulator (dev profile only): `http://localhost:8080/dev/whatsapp`
 - Webhook URL to register with Meta: `{APP_BASE_URL}/webhooks/whatsapp` (verify token = `WA_VERIFY_TOKEN`)
 - On Windows use `mvnw.cmd` from cmd/PowerShell, or `./mvnw` from Git Bash; `JAVA_HOME` must point to

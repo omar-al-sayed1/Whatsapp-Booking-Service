@@ -2,6 +2,7 @@ package app.clinicreminders.appointment;
 
 import java.time.Instant;
 
+import app.clinicreminders.appointment.AppointmentEvents.CancelledBy;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -47,6 +48,10 @@ public class Appointment {
     @Column(name = "cancelled_at")
     private Instant cancelledAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cancelled_by")
+    private CancelledBy cancelledBy;
+
     @Generated
     @Column(name = "created_at")
     private Instant createdAt;
@@ -77,10 +82,26 @@ public class Appointment {
         return status != AppointmentStatus.CANCELLED;
     }
 
-    public void cancel(Instant now) {
+    public void cancel(Instant now, CancelledBy by) {
         requireActive();
         this.status = AppointmentStatus.CANCELLED;
         this.cancelledAt = now;
+        this.cancelledBy = by;
+    }
+
+    /** Also corrects a no-show to arrived (the patient came late). */
+    public void markArrived() {
+        requireActive();
+        this.status = AppointmentStatus.ARRIVED;
+    }
+
+    /** Only once the appointment has started; also corrects an arrival marked by mistake. */
+    public void markNoShow(Instant now) {
+        requireActive();
+        if (now.isBefore(startsAt)) {
+            throw new IllegalStateException("Appointment " + id + " hasn't started yet");
+        }
+        this.status = AppointmentStatus.NO_SHOW;
     }
 
     /** @return false if it was already confirmed */
@@ -146,6 +167,10 @@ public class Appointment {
 
     public Instant getCancelledAt() {
         return cancelledAt;
+    }
+
+    public CancelledBy getCancelledBy() {
+        return cancelledBy;
     }
 
     public Instant getCreatedAt() {

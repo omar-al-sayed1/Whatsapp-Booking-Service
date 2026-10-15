@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'week', ~{::main})}">
+<head><title th:text="#{week.title}">Week</title></head>
+<body>
+<main class="container">
+    <div class="toolbar">
+        <h1 th:text="${weekLabel}">Mon 2 Nov – Sun 8 Nov</h1>
+        <nav class="day-nav">
+            <a class="button" th:href="@{/week(doctorId=${doctor?.id}, start=${previousStart})}" th:text="#{week.previous}">Previous week</a>
+            <a class="button" th:href="@{/week(doctorId=${doctor?.id}, start=${nextStart})}" th:text="#{week.next}">Next week</a>
+        </nav>
+    </div>
+    <p class="muted" th:if="${doctors.isEmpty()}" th:text="#{week.no-doctors}">No active doctors.</p>
+    <nav class="tabs" th:unless="${doctors.isEmpty()}">
+        <a th:each="d : ${doctors}" th:href="@{/week(doctorId=${d.id}, start=${monday})}" th:text="${d.displayName}"
+           th:classappend="${doctor != null and d.id == doctor.id} ? 'active'">Dr. Khoury</a>
+    </nav>
+    <div class="week" th:unless="${doctors.isEmpty()}">
+        <section class="day card" th:each="c : ${columns}" th:classappend="${c.today()} ? 'today'">
+            <h2 th:text="${c.label()}">Mon 2 Nov</h2>
+            <p class="muted" th:if="${c.closed()}" th:text="#{week.closed}">Closed</p>
+            <ul class="cells">
+                <li th:each="cell : ${c.cells()}" th:class="'cell ' + ${cell.kind()}">
+                    <span class="time" th:text="${cell.time()}">9:00 AM</span>
+                    <th:block th:switch="${cell.kind()}">
+                        <span th:case="'booked'">
+                            <span th:text="${cell.patientName()} ?: #{patient.deleted}">Rana</span>
+                            <span class="chip" th:classappend="'chip-' + ${cell.status()}" th:text="#{'status.' + ${cell.status()}}">Booked</span>
+                        </span>
+                        <a th:case="'free'" th:href="@{/appointments/new(doctorId=${doctor.id}, date=${cell.bookDate()}, time=${cell.bookTime()})}"
+                           th:text="#{week.free}">Free</a>
+                        <span th:case="*" class="muted" th:text="#{week.free}">Free</span>
+                    </th:block>
+                </li>
+            </ul>
+        </section>
+    </div>
+</main>
+</body>
+</html>

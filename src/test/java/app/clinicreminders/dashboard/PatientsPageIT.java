@@ -1,0 +1,103 @@
+package app.clinicreminders.dashboard;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
+
+import app.clinicreminders.appointment.Appointment;
+import app.clinicreminders.appointment.AppointmentRepository;
+import app.clinicreminders.appointment.AppointmentService;
+import app.clinicreminders.appointment.AppointmentSource;
+import app.clinicreminders.appointment.AppointmentStatus;
+import app.clinicreminders.booking.Conversation;
+import app.clinicreminders.booking.ConversationRepository;
+import app.clinicreminders.booking.ConversationState;
+import app.clinicreminders.clinic.Clinic;
+import app.clinicreminders.common.Language;
+import app.clinicreminders.patient.Patient;
+import app.clinicreminders.patient.PatientRepository;
+import app.clinicreminders.reminder.Reminder;
+import app.clinicreminders.reminder.ReminderRepository;
+import app.clinicreminders.reminder.ReminderStatus;
+import app.clinicreminders.scheduling.Doctor;
+import app.clinicreminders.staff.StaffPrincipal;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+class PatientsPageIT extends DashboardTest {
+
+    @Autowired
+    AppointmentService appointmentService;
+
+    @Autowired
+    AppointmentRepository appointments;
+
+    @Autowired
+    PatientRepository patients;
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    ReminderRepository reminders;
+
+    private Clinic clinic;
+    private Patient rana;
+    private StaffPrincipal staff;
+
+    @BeforeEach
+    void clinicWithPatients() {
+        clinic = data.connectedClinic("A", "pn-a");
+        rana = data.patient(clinic, "Rana Haddad", "+96170123456", Language.AR);
+        data.patient(clinic, "Karim", "+9613111222", Language.EN);
+        Clinic other = data.clinic("B");
+        data.patient(other, "Rania Elsewhere", "+96170123457", Language.AR);
+        staff = secretaryOf(clinic);
+    }
+
+    @Test
+    void searchesByNameOrByPhoneAsTyped() {
+        assertThat(get(staff, "/patients?q=ran")).hasStatusOk().bodyText()
+                .contains("Rana Haddad").doesNotContain("Karim", "Rania Elsewhere");
+        assertThat(get(staff, "/patients?q=70 123")).bodyText()
+                .contains("Rana Haddad").doesNotContain("Rania Elsewhere");
+        assertThat(get(staff, "/patients?q=03 111")).bodyText()
+                .contains("Karim").doesNotContain("Rana Haddad");
+    }
+
+    @Test
+    void deletingAPatientCancelsTheFutureKeepsThePastAndForgetsTheConversation() {
+        Doctor doctor = data.doctor(clinic, 30);
+        Appointment past = data.appointment(doctor, rana, Instant.parse("2026-10-01T07:00:00Z"), Duration.ofMinutes(30));
+        Appointment future = appointmentService.book(clinic.getId(), doctor.getId(), rana.getId(),
+                Instant.parse("2026-11-03T08:30:00Z"), AppointmentSource.WHATSAPP);
+        conversations.save(new Conversation(clinic.getId(), rana.getPhoneE164(), ConversationState.MENU,
+                Instant.parse("2026-10-14T09:30:00Z")));
+
+        assertThat(post(staff, "/patients/{id}/delete", rana.getId()))
+                .hasStatus3xxRedirection().headers().hasValue("Location", "/patients");
+
+        assertThat(patients.findByIdAndClinicId(rana.getId(), clinic.getId())).isEmpty();
+        Appointment cancelled = appointments.findByIdAndClinicId(future.getId(), clinic.getId()).orElseThrow();
+        assertThat(cancelled.getStatus()).isEqualTo(AppointmentStatus.CANCELLED);
+        assertThat(cancelled.getPatientId()).isNull();
+        assertThat(reminders.findByClinicIdAndAppointmentIdOrderByDueAt(clinic.getId(), future.getId()))
+                .extracting(Reminder::getStatus).doesNotContain(ReminderStatus.PENDING);
+        Map<String, Object> kept = jdbc.queryForMap("select status, patient_id from appointment where id = ?", past.getId());
+        assertThat(kept.get("status")).isEqualTo("BOOKED");
+        assertThat(kept.get("patient_id")).isNull();
+        assertThat(jdbc.queryForObject("select count(*) from conversation", Integer.class)).isZero();
+    }
+
+    @Test
+    void anotherClinicsPatientCannotBeDeleted() {
+        Patient theirs = patients.findByClinicIdAndPhoneE164(
+                jdbc.queryForObject("select id from clinic where name = 'B'", Long.class), "+96170123457").orElseThrow();
+
+        assertThat(post(staff, "/patients/{id}/delete", theirs.getId())).hasStatus(404);
+        assertThat(jdbc.queryForObject("select count(*) from patient", Integer.class)).isEqualTo(3);
+    }
+}

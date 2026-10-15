@@ -13,23 +13,30 @@ import app.clinicreminders.scheduling.DoctorRepository;
 import app.clinicreminders.scheduling.ScheduleRule;
 import app.clinicreminders.scheduling.ScheduleRuleRepository;
 import app.clinicreminders.scheduling.TimeWindow;
+import app.clinicreminders.staff.StaffRole;
+import app.clinicreminders.staff.StaffUser;
+import app.clinicreminders.staff.StaffUserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Dev profile only: makes sure there is a clinic connected to the fake WhatsApp number, with a
- * doctor and a patient, so the simulator works on an empty database. M8's demo seed replaces this.
+ * doctor, a patient and two logins ({@code owner} and {@code secretary}, password {@code dev}), so
+ * the dashboard and the simulator work on an empty database. M8's demo seed replaces this.
  */
 @Component
 @Profile("dev")
 class DevDataInitializer implements ApplicationRunner {
 
     static final String DEV_PHONE_NUMBER_ID = "dev-phone-number-id";
+    /** Development only; this profile never runs in production. */
+    private static final String DEV_PASSWORD = "dev";
 
     private static final Logger log = LoggerFactory.getLogger(DevDataInitializer.class);
 
@@ -37,21 +44,28 @@ class DevDataInitializer implements ApplicationRunner {
     private final DoctorRepository doctors;
     private final ScheduleRuleRepository rules;
     private final PatientRepository patients;
+    private final StaffUserRepository users;
+    private final PasswordEncoder passwordEncoder;
 
     DevDataInitializer(ClinicRepository clinics, DoctorRepository doctors, ScheduleRuleRepository rules,
-                       PatientRepository patients) {
+                       PatientRepository patients, StaffUserRepository users, PasswordEncoder passwordEncoder) {
         this.clinics = clinics;
         this.doctors = doctors;
         this.rules = rules;
         this.patients = patients;
+        this.users = users;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        if (clinics.findByWaPhoneNumberId(DEV_PHONE_NUMBER_ID).isPresent()) {
-            return;
-        }
+        Clinic clinic = clinics.findByWaPhoneNumberId(DEV_PHONE_NUMBER_ID).orElseGet(this::createClinic);
+        ensureUser(clinic, "owner", StaffRole.OWNER);
+        ensureUser(clinic, "secretary", StaffRole.SECRETARY);
+    }
+
+    private Clinic createClinic() {
         Clinic clinic = new Clinic("Dev Clinic", Clinic.DEFAULT_ZONE, Language.AR);
         clinic.connectWhatsApp(DEV_PHONE_NUMBER_ID, "dev-waba", null);
         clinic = clinics.save(clinic);
@@ -64,5 +78,13 @@ class DevDataInitializer implements ApplicationRunner {
         }
         patients.save(new Patient(clinic.getId(), "Dev Patient", "+96170000001", Language.AR));
         log.info("Created the dev clinic; simulate patients at /dev/whatsapp");
+        return clinic;
+    }
+
+    private void ensureUser(Clinic clinic, String username, StaffRole role) {
+        if (users.findByUsernameIgnoreCase(username).isEmpty()) {
+            users.save(StaffUser.clinicStaff(clinic.getId(), username, passwordEncoder.encode(DEV_PASSWORD), role, Language.AR));
+            log.info("Created dev login '{}' (password '{}')", username, DEV_PASSWORD);
+        }
     }
 }

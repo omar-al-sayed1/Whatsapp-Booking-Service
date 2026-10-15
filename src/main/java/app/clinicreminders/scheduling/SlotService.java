@@ -41,32 +41,48 @@ public class SlotService {
      */
     @Transactional(readOnly = true)
     public List<Slot> freeSlots(long clinicId, long doctorId, LocalDate from, LocalDate to) {
-        Clinic clinic = clinics.findById(clinicId).orElseThrow(() -> new NotFoundException("Clinic", clinicId));
-        Doctor doctor = doctors.findByIdAndClinicId(doctorId, clinicId)
-                .orElseThrow(() -> new NotFoundException("Doctor", doctorId));
+        Doctor doctor = doctor(clinicId, doctorId);
         if (!doctor.isActive()) {
             return List.of();
         }
-        ZoneId zone = clinic.getTimezone();
-
-        DoctorSchedule.Builder schedule = DoctorSchedule.builder(zone, doctor.slotLength());
-        for (ScheduleRule rule : rules.findByClinicIdAndDoctorId(clinicId, doctorId)) {
-            schedule.weekly(rule.getDayOfWeek(), rule.window().start(), rule.window().end());
-        }
-        for (ScheduleException exception : exceptions.findByClinicIdAndDoctorIdAndExceptionDateBetween(
-                clinicId, doctorId, from, to)) {
-            exception.hours().ifPresentOrElse(
-                    hours -> schedule.hoursOn(exception.getExceptionDate(), hours.start(), hours.end()),
-                    () -> schedule.closedOn(exception.getExceptionDate()));
-        }
-
+        ZoneId zone = zone(clinicId);
         // atStartOfDay(zone) handles a midnight that doesn't exist on a DST change day.
         Instant rangeStart = from.atStartOfDay(zone).toInstant();
         Instant rangeEnd = to.plusDays(1).atStartOfDay(zone).toInstant();
         List<TimeRange> busy = appointments.findActiveOverlapping(clinicId, doctorId, rangeStart, rangeEnd).stream()
                 .map(a -> new TimeRange(a.getStartsAt(), a.getEndsAt()))
                 .toList();
+        return SlotEngine.freeSlots(schedule(clinicId, doctor, zone, from, to), from, to, busy, clock.instant());
+    }
 
-        return SlotEngine.freeSlots(schedule.build(), from, to, busy, clock.instant());
+    /** Every slot of the doctor's opening hours, booked or not, past or not (the week grid). */
+    @Transactional(readOnly = true)
+    public List<Slot> allSlots(long clinicId, long doctorId, LocalDate from, LocalDate to) {
+        Doctor doctor = doctor(clinicId, doctorId);
+        ZoneId zone = zone(clinicId);
+        return SlotEngine.freeSlots(schedule(clinicId, doctor, zone, from, to), from, to, List.of(), Instant.MIN);
+    }
+
+    private DoctorSchedule schedule(long clinicId, Doctor doctor, ZoneId zone, LocalDate from, LocalDate to) {
+        DoctorSchedule.Builder schedule = DoctorSchedule.builder(zone, doctor.slotLength());
+        for (ScheduleRule rule : rules.findByClinicIdAndDoctorId(clinicId, doctor.getId())) {
+            schedule.weekly(rule.getDayOfWeek(), rule.window().start(), rule.window().end());
+        }
+        for (ScheduleException exception : exceptions.findByClinicIdAndDoctorIdAndExceptionDateBetween(
+                clinicId, doctor.getId(), from, to)) {
+            exception.hours().ifPresentOrElse(
+                    hours -> schedule.hoursOn(exception.getExceptionDate(), hours.start(), hours.end()),
+                    () -> schedule.closedOn(exception.getExceptionDate()));
+        }
+        return schedule.build();
+    }
+
+    private Doctor doctor(long clinicId, long doctorId) {
+        return doctors.findByIdAndClinicId(doctorId, clinicId).orElseThrow(() -> new NotFoundException("Doctor", doctorId));
+    }
+
+    private ZoneId zone(long clinicId) {
+        return clinics.findById(clinicId).map(Clinic::getTimezone)
+                .orElseThrow(() -> new NotFoundException("Clinic", clinicId));
     }
 }

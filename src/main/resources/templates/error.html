@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<!--/* Spring Boot's error page. Standalone and bilingual: the dashboard model isn't available here. */-->
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${status} ?: 'Error'">Error</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<main class="container narrow">
+    <div class="card">
+        <h1 th:text="${status == 404} ? 'Page not found' : 'Something went wrong'">Something went wrong</h1>
+        <p lang="ar" dir="rtl" th:text="${status == 404} ? 'الصفحة غير موجودة' : 'حدث خطأ ما'">حدث خطأ ما</p>
+        <p><a th:href="@{/}">← Today / اليوم</a></p>
+    </div>
+</main>
+</body>
+</html>

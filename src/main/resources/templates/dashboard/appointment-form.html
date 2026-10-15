@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'today', ~{::main})}">
+<head>
+    <title th:text="${form.appointmentId() == null} ? #{appointment.new.title} : #{appointment.reschedule.title}">New appointment</title>
+</head>
+<body>
+<main class="container narrow">
+    <h1 th:text="${form.appointmentId() == null} ? #{appointment.new.title} : #{appointment.reschedule.title}">New appointment</h1>
+    <p class="alert" role="alert" th:if="${error}" th:text="#{${error}}">Error</p>
+    <p class="muted" th:if="${form.patientLabel()}" th:text="${form.patientLabel()}">Rana · Dr. Khoury · Tue 3 Nov 10:30 AM</p>
+
+    <form method="post" class="card stack"
+          th:action="${form.appointmentId() == null} ? @{/appointments} : @{/appointments/{id}/reschedule(id=${form.appointmentId()})}">
+
+        <div class="row" th:if="${form.appointmentId() == null}">
+            <label>
+                <span th:text="#{form.doctor}">Doctor</span>
+                <select name="doctorId" th:hx-get="@{/appointments/slots}" hx-target="#slots" hx-swap="outerHTML"
+                        hx-include="[name='date']" hx-trigger="change">
+                    <option th:each="d : ${doctors}" th:value="${d.id}" th:text="${d.displayName}"
+                            th:selected="${d.id == form.doctorId()}">Dr. Khoury</option>
+                </select>
+            </label>
+        </div>
+        <input type="hidden" name="appointmentId" th:if="${form.appointmentId() != null}" th:value="${form.appointmentId()}">
+
+        <label>
+            <span th:text="#{form.date}">Date</span>
+            <input type="date" name="date" th:value="${form.date()}" required
+                   th:hx-get="@{/appointments/slots}" hx-target="#slots" hx-swap="outerHTML"
+                   hx-include="[name='doctorId'],[name='appointmentId']" hx-trigger="change">
+        </label>
+
+        <fieldset th:fragment="slots" id="slots" class="slots">
+            <legend th:text="#{form.free-times}">Free times</legend>
+            <p class="muted" th:if="${slots.isEmpty()}" th:text="#{form.no-free-times}">No free times that day.</p>
+            <label class="slot" th:each="s : ${slots}">
+                <input type="radio" name="time" th:value="${s.value()}" th:checked="${s.value() == form.time()}">
+                <span th:text="${s.label()}">10:30 AM</span>
+            </label>
+        </fieldset>
+
+        <label>
+            <span th:text="#{form.other-time}">Or another time</span>
+            <input type="time" name="otherTime" th:value="${form.otherTime()}">
+            <small class="muted" th:text="#{form.other-time.hint}">For squeezing someone in</small>
+        </label>
+
+        <fieldset th:if="${form.appointmentId() == null}" class="stack">
+            <legend th:text="#{form.patient}">Patient</legend>
+            <label>
+                <span th:text="#{form.phone}">Phone</span>
+                <input type="tel" name="phone" th:value="${form.phone()}" required dir="ltr" inputmode="tel">
+                <small class="muted" th:text="#{form.phone.hint}">e.g. 03 123 456</small>
+            </label>
+            <label>
+                <span th:text="#{form.name}">Name</span>
+                <input type="text" name="name" th:value="${form.name()}">
+                <small class="muted" th:text="#{form.name.hint}">Needed for a new patient</small>
+            </label>
+            <label>
+                <span th:text="#{form.language}">Messages in</span>
+                <select name="language">
+                    <option value="ar" th:selected="${form.language() == 'ar'}" th:text="#{language.ar}">Arabic</option>
+                    <option value="en" th:selected="${form.language() == 'en'}" th:text="#{language.en}">English</option>
+                </select>
+            </label>
+        </fieldset>
+
+        <div class="buttons">
+            <button type="submit" class="primary"
+                    th:text="${form.appointmentId() == null} ? #{form.book} : #{form.move}">Book</button>
+            <a class="button" th:href="@{/(date=${form.date()})}" th:text="#{action.back}">Back</a>
+        </div>
+    </form>
+</main>
+</body>
+</html>

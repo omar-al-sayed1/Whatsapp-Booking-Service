@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'operator', ~{::main})}">
+<head><title th:text="#{operator.title}">Operator</title></head>
+<body>
+<main class="container narrow">
+    <h1 th:text="#{operator.title}">Operator</h1>
+    <p class="muted" th:text="#{operator.placeholder}">Operator pages arrive in a later version.</p>
+</main>
+</body>
+</html>

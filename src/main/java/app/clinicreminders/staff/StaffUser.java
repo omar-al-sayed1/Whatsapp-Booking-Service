@@ -64,6 +64,11 @@ public class StaffUser {
         return new StaffUser(clinicId, username, passwordHash, role, language);
     }
 
+    /** The dashboard's language for this user. */
+    public void changeLanguage(Language language) {
+        this.language = language;
+    }
+
     public Long getId() {
         return id;
     }

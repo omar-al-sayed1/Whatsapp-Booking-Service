@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/* The day's list. Reloads itself every 30 s; actions post with htmx and get this fragment back. */-->
+<section id="today-list" th:fragment="list" th:hx-get="@{/today/list(date=${date})}" hx-trigger="every 30s"
+         hx-swap="outerHTML">
+    <p class="muted" th:if="${doctors.isEmpty()}" th:text="#{today.no-doctors}">No doctors yet.</p>
+    <div class="doctor card" th:each="d : ${doctors}">
+        <h2 th:text="${d.name()}">Dr. Khoury</h2>
+        <p class="muted" th:if="${d.rows().isEmpty()}" th:text="#{today.empty}">No appointments.</p>
+        <table class="appointments" th:unless="${d.rows().isEmpty()}">
+            <tbody>
+            <tr th:each="r : ${d.rows()}" th:classappend="${r.cancelled()} ? 'cancelled'"
+                th:attr="data-appointment=${r.id()}">
+                <td class="time" th:text="${r.time()}">10:30 AM</td>
+                <td class="patient">
+                    <strong th:text="${r.patientName()} ?: #{patient.deleted}">Rana</strong>
+                    <a class="muted phone" th:if="${r.patientPhone()}" th:href="'tel:' + ${r.patientPhone()}"
+                       th:text="${r.patientPhone()}" dir="ltr">+96170123456</a>
+                </td>
+                <td class="status">
+                    <span class="chip" th:classappend="${r.cancelledByPatient()} ? 'chip-patient-cancelled' : 'chip-' + ${r.status()}"
+                          th:text="${r.cancelledByPatient()} ? #{status.cancelled-by-patient} : #{'status.' + ${r.status()}}">Booked</span>
+                    <span class="muted small" th:text="#{'source.' + ${r.source()}}">WhatsApp</span>
+                </td>
+                <td class="actions">
+                    <form th:if="${r.canArrive()}" method="post" th:action="@{/appointments/{id}/arrived(id=${r.id()})}"
+                          th:hx-post="@{/appointments/{id}/arrived(id=${r.id()})}" hx-target="#today-list" hx-swap="outerHTML">
+                        <button type="submit" th:text="#{action.arrived}">Arrived</button>
+                    </form>
+                    <form th:if="${r.canNoShow()}" method="post" th:action="@{/appointments/{id}/no-show(id=${r.id()})}"
+                          th:hx-post="@{/appointments/{id}/no-show(id=${r.id()})}" hx-target="#today-list" hx-swap="outerHTML">
+                        <button type="submit" th:text="#{action.no-show}">No-show</button>
+                    </form>
+                    <a th:if="${r.canReschedule()}" class="button"
+                       th:href="@{/appointments/{id}/reschedule(id=${r.id()})}" th:text="#{action.reschedule}">Move</a>
+                    <form th:if="${r.canCancel()}" method="post" th:action="@{/appointments/{id}/cancel(id=${r.id()})}"
+                          th:hx-post="@{/appointments/{id}/cancel(id=${r.id()})}" hx-target="#today-list" hx-swap="outerHTML"
+                          th:hx-confirm="#{action.cancel-confirm}">
+                        <button type="submit" class="danger" th:text="#{action.cancel}">Cancel</button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+<!--/* Returned with HX-Refresh when an action no longer applies: htmx reloads the page. */-->
+<section th:fragment="empty"></section>
+</body>
+</html>

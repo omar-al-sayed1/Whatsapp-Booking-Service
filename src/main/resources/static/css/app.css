@@ -1,0 +1,133 @@
+/*
+ * Dashboard styles. Logical properties (inline-start/end) only, so the same rules work for
+ * Arabic (dir="rtl") and English. No framework, no build step.
+ */
+:root {
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --text: #1d2433;
+    --muted: #5d6677;
+    --line: #dfe3ea;
+    --accent: #0f6e6a;
+    --accent-text: #ffffff;
+    --danger: #b3261e;
+    --radius: 8px;
+    --space: 1rem;
+    font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans Arabic", Tahoma, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; line-height: 1.5; }
+h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.1rem; margin: 0 0 .75rem; }
+h3 { font-size: 1rem; margin: 1.25rem 0 .5rem; }
+a { color: var(--accent); }
+.muted { color: var(--muted); }
+.small { font-size: .85rem; }
+
+/* Layout */
+.container { max-width: 1100px; margin: 0 auto; padding: var(--space); }
+.container.narrow { max-width: 720px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+        padding: var(--space); margin-block-end: var(--space); }
+.stack { display: flex; flex-direction: column; gap: .75rem; }
+.row { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; }
+.buttons { display: flex; gap: .5rem; flex-wrap: wrap; }
+.toolbar { display: flex; flex-wrap: wrap; gap: var(--space); align-items: center; justify-content: space-between;
+           margin-block-end: var(--space); }
+.inline { display: inline; }
+
+/* Top bar */
+.topbar { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; align-items: center; padding: .6rem var(--space);
+          background: var(--surface); border-block-end: 1px solid var(--line); }
+.topbar .brand { font-size: 1.05rem; }
+.topbar .nav { display: flex; flex-wrap: wrap; gap: .25rem; flex: 1; }
+.topbar .nav a { padding: .35rem .7rem; border-radius: var(--radius); text-decoration: none; color: var(--text); }
+.topbar .nav a.active { background: var(--accent); color: var(--accent-text); }
+.topbar .account { display: flex; gap: .75rem; align-items: center; margin-inline-start: auto; }
+
+/* Messages */
+.messages { max-width: 1100px; margin: 0 auto; padding-inline: var(--space); }
+.notice, .alert { padding: .6rem .8rem; border-radius: var(--radius); margin-block: .75rem 0; }
+.notice { background: #e4f4ee; color: #135a3c; }
+.alert { background: #fbe9e7; color: var(--danger); }
+
+/* Forms */
+label { display: flex; flex-direction: column; gap: .25rem; }
+label.check { flex-direction: row; align-items: center; gap: .5rem; }
+input, select, button, .button { font: inherit; }
+input[type=text], input[type=tel], input[type=search], input[type=password], input[type=date], input[type=time],
+input[type=number], select {
+    padding: .45rem .6rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface);
+    min-width: 0;
+}
+button, .button { display: inline-block; padding: .4rem .8rem; border: 1px solid var(--line); border-radius: var(--radius);
+                  background: var(--surface); color: var(--text); cursor: pointer; text-decoration: none; white-space: nowrap; }
+button.primary, .button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+button.danger, .button.danger { color: var(--danger); border-color: #efc7c3; }
+button.link { border: 0; background: none; padding: 0; color: var(--accent); }
+button.link.danger { color: var(--danger); }
+fieldset { border: 1px solid var(--line); border-radius: var(--radius); padding: .75rem; margin: 0; }
+legend { padding-inline: .25rem; color: var(--muted); }
+.search { display: flex; gap: .5rem; margin-block-end: var(--space); }
+.search input { flex: 1; }
+
+/* Free-slot picker */
+.slots { display: flex; flex-wrap: wrap; gap: .4rem; }
+.slot { flex-direction: row; align-items: center; gap: .3rem; border: 1px solid var(--line); border-radius: var(--radius);
+        padding: .3rem .6rem; cursor: pointer; }
+.slot:has(input:checked) { border-color: var(--accent); background: #e6f2f1; }
+
+/* Lists */
+table { width: 100%; border-collapse: collapse; }
+td, th { padding: .5rem .4rem; border-block-end: 1px solid var(--line); text-align: start; vertical-align: middle; }
+tr:last-child td, tr:last-child th { border-block-end: 0; }
+.actions { text-align: end; white-space: nowrap; }
+.actions form { display: inline; }
+.actions > * + * { margin-inline-start: .3rem; }
+.appointments .time { width: 6rem; font-variant-numeric: tabular-nums; font-weight: 600; }
+.appointments tr.cancelled td:not(.status):not(.actions) { color: var(--muted); text-decoration: line-through; }
+.phone { display: block; font-size: .9rem; }
+.error-text { color: var(--danger); }
+.window { display: inline-flex; gap: .3rem; align-items: center; margin-inline-end: .75rem; }
+
+/* Status chips */
+.chip { display: inline-block; padding: .1rem .5rem; border-radius: 999px; font-size: .8rem; background: #eceff4; }
+.chip-BOOKED { background: #e8eefc; color: #1f4aa8; }
+.chip-CONFIRMED { background: #e4f4ee; color: #135a3c; }
+.chip-ARRIVED { background: #dff3f8; color: #0b5a6e; }
+.chip-NO_SHOW { background: #fdf0d8; color: #7a4b00; }
+.chip-CANCELLED { background: #eceff4; color: var(--muted); }
+.chip-patient-cancelled { background: #fbe9e7; color: var(--danger); font-weight: 600; }
+
+/* Week grid */
+.tabs { display: flex; flex-wrap: wrap; gap: .3rem; margin-block-end: var(--space); }
+.tabs a { padding: .35rem .7rem; border: 1px solid var(--line); border-radius: var(--radius); text-decoration: none;
+          background: var(--surface); }
+.tabs a.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .5rem; }
+.week .day { padding: .6rem; margin: 0; }
+.week .day.today { border-color: var(--accent); }
+.week h2 { font-size: .95rem; }
+.cells { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .25rem; }
+.cell { font-size: .85rem; padding: .25rem .35rem; border-radius: 6px; display: flex; flex-direction: column; }
+.cell .time { font-weight: 600; font-variant-numeric: tabular-nums; }
+.cell.booked { background: #eef2fb; }
+.cell.free { background: #eef7f4; }
+.cell.past { opacity: .6; }
+
+/* Login */
+.login { margin-block-start: 10vh; }
+.switch-language { text-align: center; margin-block-end: 0; }
+
+/* Phones and small screens */
+@media (max-width: 800px) {
+    .week { grid-template-columns: 1fr; }
+    .appointments tr { display: grid; grid-template-columns: 5rem 1fr; gap: .25rem .5rem; padding-block: .5rem;
+                       border-block-end: 1px solid var(--line); }
+    .appointments td { border: 0; padding: 0; }
+    .appointments .actions { grid-column: 1 / -1; text-align: start; }
+    .topbar .account { margin-inline-start: 0; }
+}

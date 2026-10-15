@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'patients', ~{::main})}">
+<head><title th:text="#{patients.title}">Patients</title></head>
+<body>
+<main class="container">
+    <h1 th:text="#{patients.title}">Patients</h1>
+    <form method="get" th:action="@{/patients}" class="search">
+        <input type="search" name="q" th:value="${q}" th:placeholder="#{patients.search}" th:aria-label="#{patients.search}">
+        <button type="submit" th:text="#{action.search}">Search</button>
+    </form>
+    <p class="muted" th:if="${patients.isEmpty()}" th:text="#{patients.empty}">No patients found.</p>
+    <table class="list card" th:unless="${patients.isEmpty()}">
+        <tbody>
+        <tr th:each="p : ${patients}">
+            <td><strong th:text="${p.name}">Rana</strong>
+                <span class="chip chip-CANCELLED" th:if="${p.optedOut}" th:text="#{patients.opted-out}">Opted out</span></td>
+            <td><a th:href="'tel:' + ${p.phoneE164}" th:text="${p.phoneE164}" dir="ltr">+96170123456</a></td>
+            <td class="muted" th:text="#{'language.' + ${p.language.code()}}">Arabic</td>
+            <td class="actions">
+                <form method="post" th:action="@{/patients/{id}/delete(id=${p.id})}"
+                      onsubmit="return confirm(this.dataset.confirm)" th:data-confirm="#{patients.delete-confirm}">
+                    <button type="submit" class="danger" th:text="#{action.delete}">Delete</button>
+                </form>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+</main>
+</body>
+</html>

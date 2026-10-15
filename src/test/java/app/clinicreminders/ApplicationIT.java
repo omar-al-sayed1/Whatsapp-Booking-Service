@@ -1,6 +1,7 @@
 package app.clinicreminders;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,8 +27,10 @@ class ApplicationIT extends IntegrationTest {
 
     @Test
     void onlyTheHealthEndpointIsExposed() {
-        assertThat(mvc.get().uri("/actuator/env")).hasStatus(404);
-        assertThat(mvc.get().uri("/actuator/beans")).hasStatus(404);
+        // Logged in, so the 404 comes from Actuator not exposing them, not from security.
+        assertThat(mvc.get().uri("/actuator/env").with(user("staff").roles("SECRETARY"))).hasStatus(404);
+        assertThat(mvc.get().uri("/actuator/beans").with(user("staff").roles("SECRETARY"))).hasStatus(404);
+        assertThat(mvc.get().uri("/actuator/env")).hasStatus3xxRedirection();
     }
 
     @Test

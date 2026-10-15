@@ -59,6 +59,16 @@ public class Conversation {
         this.expiresAt = expiresAt;
     }
 
+    /** Flags the conversation for the secretary (M5: unrecognised text). */
+    public void flagForHuman() {
+        this.needsHuman = true;
+    }
+
+    /** The secretary has dealt with it (e.g. called the patient back). */
+    public void markHandled() {
+        this.needsHuman = false;
+    }
+
     public Long getId() {
         return id;
     }

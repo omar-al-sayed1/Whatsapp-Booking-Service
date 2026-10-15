@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'settings', ~{::main})}">
+<head><title th:text="#{settings.title}">Settings</title></head>
+<body>
+<main class="container narrow">
+    <h1 th:text="#{settings.title}">Settings</h1>
+
+    <section class="card">
+        <h2 th:text="#{settings.clinic}">Clinic</h2>
+        <form method="post" th:action="@{/settings/clinic}" class="stack">
+            <label>
+                <span th:text="#{settings.default-language}">New patients' language</span>
+                <select name="defaultLanguage">
+                    <option value="ar" th:selected="${defaultLanguage == 'ar'}" th:text="#{language.ar}">Arabic</option>
+                    <option value="en" th:selected="${defaultLanguage == 'en'}" th:text="#{language.en}">English</option>
+                </select>
+            </label>
+            <label class="check">
+                <input type="checkbox" name="h24Enabled" value="true" th:checked="${h24Enabled}">
+                <span th:text="#{settings.h24}">Send a reminder the day before</span>
+            </label>
+            <label class="check">
+                <input type="checkbox" name="h2Enabled" value="true" th:checked="${h2Enabled}">
+                <span th:text="#{settings.h2}">Send a reminder 2 hours before</span>
+            </label>
+            <div class="buttons"><button type="submit" class="primary" th:text="#{action.save}">Save</button></div>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2 th:text="#{settings.doctors}">Doctors</h2>
+        <table class="list" th:unless="${doctors.isEmpty()}">
+            <tbody>
+            <tr th:each="d : ${doctors}">
+                <td><strong th:text="${d.displayName}">Dr. Khoury</strong></td>
+                <td class="muted" th:text="#{settings.doctor.minutes(${d.slotMinutes})}">30 min</td>
+                <td class="muted" th:text="${d.active} ? #{settings.doctor.active} : #{settings.doctor.inactive}">Taking appointments</td>
+                <td class="actions"><a class="button" th:href="@{/settings/doctors/{id}(id=${d.id})}"
+                                       th:text="#{settings.doctor.hours-link}">Hours and days off</a></td>
+            </tr>
+            </tbody>
+        </table>
+        <h3 th:text="#{settings.doctor.add}">Add a doctor</h3>
+        <form method="post" th:action="@{/settings/doctors}" class="row">
+            <label><span th:text="#{settings.doctor.name}">Name</span><input type="text" name="displayName" required></label>
+            <label><span th:text="#{settings.doctor.slot}">Slot length</span>
+                <input type="number" name="slotMinutes" value="30" min="5" max="240" step="5" required></label>
+            <button type="submit" th:text="#{action.add}">Add</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

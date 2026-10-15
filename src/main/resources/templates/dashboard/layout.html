@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<!--/* Shared page shell. Pages call page(title, active, content); lang and dir come from DashboardModel. */-->
+<html xmlns:th="http://www.thymeleaf.org" th:fragment="page(title, active, content)" th:lang="${lang}" th:dir="${dir}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:replace="${title}">Clinic Reminders</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <!--/* Keep the version in step with htmx.version in pom.xml. */-->
+    <script th:src="@{/webjars/htmx.org/2.0.11/dist/htmx.min.js}" defer></script>
+</head>
+<body>
+<header class="topbar" th:if="${staff != null}">
+    <div class="brand">
+        <strong th:text="${clinicName} ?: #{app.name}">Clinic</strong>
+    </div>
+    <nav class="nav" th:if="${staff.clinicId() != null}">
+        <a th:href="@{/}" th:classappend="${active == 'today'} ? 'active'" th:text="#{nav.today}">Today</a>
+        <a th:href="@{/week}" th:classappend="${active == 'week'} ? 'active'" th:text="#{nav.week}">Week</a>
+        <a th:href="@{/patients}" th:classappend="${active == 'patients'} ? 'active'" th:text="#{nav.patients}">Patients</a>
+        <a th:href="@{/attention}" th:classappend="${active == 'attention'} ? 'active'" th:text="#{nav.attention}">Needs attention</a>
+        <a th:href="@{/settings}" th:classappend="${active == 'settings'} ? 'active'" th:text="#{nav.settings}">Settings</a>
+    </nav>
+    <div class="account">
+        <form method="post" th:action="@{/language}" class="inline">
+            <input type="hidden" name="lang" th:value="${otherLang}">
+            <button type="submit" class="link" th:lang="${otherLang}" th:text="#{'language.switch.' + ${otherLang}}">English</button>
+        </form>
+        <span class="muted" th:text="${staff.username}">user</span>
+        <form method="post" th:action="@{/logout}" class="inline">
+            <button type="submit" class="link" th:text="#{nav.logout}">Log out</button>
+        </form>
+    </div>
+</header>
+<div class="messages">
+    <p class="notice" role="status" th:if="${notice}" th:text="#{${notice}}">Saved.</p>
+    <p class="alert" role="alert" th:if="${error}" th:text="#{${error}}">Error</p>
+</div>
+<main th:replace="${content}">content</main>
+</body>
+</html>

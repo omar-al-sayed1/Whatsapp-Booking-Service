@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'attention', ~{::main})}">
+<head><title th:text="#{attention.title}">Needs attention</title></head>
+<body>
+<main class="container">
+    <h1 th:text="#{attention.title}">Needs attention</h1>
+
+    <section class="card">
+        <h2 th:text="#{attention.waiting}">Patients waiting for a call back</h2>
+        <p class="muted" th:if="${waiting.isEmpty()}" th:text="#{attention.waiting.empty}">Nobody is waiting.</p>
+        <table class="list" th:unless="${waiting.isEmpty()}">
+            <tbody>
+            <tr th:each="w : ${waiting}">
+                <td><strong th:text="${w.patientName()} ?: #{attention.unknown-patient}">Rana</strong></td>
+                <td><a th:href="'tel:' + ${w.phone()}" th:text="${w.phone()}" dir="ltr">+96170123456</a></td>
+                <td class="muted" th:text="${w.updated()}">Tue 3 Nov 10:30 AM</td>
+                <td class="actions">
+                    <form method="post" th:action="@{/attention/conversations/{id}/handled(id=${w.id()})}">
+                        <button type="submit" th:text="#{action.handled}">Done</button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="card">
+        <h2 th:text="#{attention.failed}">Messages that could not be sent</h2>
+        <p class="muted" th:if="${failed.isEmpty()}" th:text="#{attention.failed.empty}">No failed messages.</p>
+        <table class="list" th:unless="${failed.isEmpty()}">
+            <tbody>
+            <tr th:each="f : ${failed}">
+                <td class="muted" th:text="${f.failed()}">Mon 2 Nov 10:30 AM</td>
+                <td>
+                    <strong th:text="${f.patientName()} ?: #{attention.unknown-patient}">Rana</strong>
+                    <a class="muted phone" th:if="${f.patientPhone()}" th:href="'tel:' + ${f.patientPhone()}"
+                       th:text="${f.patientPhone()}" dir="ltr">+96170123456</a>
+                </td>
+                <td>
+                    <span th:text="${f.templateName()} ? #{attention.reminder} : #{attention.message}">Reminder</span>
+                    <span class="muted small" th:if="${f.appointment()}"
+                          th:text="#{attention.for-appointment} + ': ' + ${f.appointment()}">Appointment: Tue 3 Nov</span>
+                </td>
+                <td class="error-text" th:text="${f.error()}">Message undeliverable (131026)</td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+</main>
+</body>
+</html>

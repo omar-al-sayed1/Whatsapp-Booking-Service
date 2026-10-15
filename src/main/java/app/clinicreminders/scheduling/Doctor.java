@@ -48,8 +48,17 @@ public class Doctor {
         this.slotMinutes = slotMinutes;
     }
 
+    public void rename(String displayName) {
+        this.displayName = displayName;
+    }
+
+    /** Inactive doctors get no new slots; their existing appointments stay. */
     public void deactivate() {
         this.active = false;
+    }
+
+    public void activate() {
+        this.active = true;
     }
 
     public Long getId() {

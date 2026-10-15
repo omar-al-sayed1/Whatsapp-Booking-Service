@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import java.time.Instant;
 
+import app.clinicreminders.appointment.AppointmentEvents.CancelledBy;
 import org.junit.jupiter.api.Test;
 
 class AppointmentTest {
@@ -33,15 +34,38 @@ class AppointmentTest {
     }
 
     @Test
-    void aCancelledAppointmentCanNotBeConfirmedMovedOrCancelledAgain() {
+    void cancellingRecordsWhenAndByWhom() {
         Appointment appointment = booked();
-        appointment.cancel(NOW);
+
+        appointment.cancel(NOW, CancelledBy.PATIENT);
 
         assertThat(appointment.isActive()).isFalse();
         assertThat(appointment.getCancelledAt()).isEqualTo(NOW);
+        assertThat(appointment.getCancelledBy()).isEqualTo(CancelledBy.PATIENT);
+    }
+
+    @Test
+    void aCancelledAppointmentCanNotChangeAnyMore() {
+        Appointment appointment = booked();
+        appointment.cancel(NOW, CancelledBy.STAFF);
+
         assertThatIllegalStateException().isThrownBy(appointment::confirm);
         assertThatIllegalStateException().isThrownBy(() -> appointment.reschedule(START, START.plusSeconds(60)));
-        assertThatIllegalStateException().isThrownBy(() -> appointment.cancel(NOW));
+        assertThatIllegalStateException().isThrownBy(() -> appointment.cancel(NOW, CancelledBy.STAFF));
+        assertThatIllegalStateException().isThrownBy(appointment::markArrived);
+        assertThatIllegalStateException().isThrownBy(() -> appointment.markNoShow(START.plusSeconds(60)));
+    }
+
+    @Test
+    void noShowOnlyOnceItHasStartedAndArrivedCanCorrectIt() {
+        Appointment appointment = booked();
+
+        assertThatIllegalStateException().isThrownBy(() -> appointment.markNoShow(START.minusSeconds(1)));
+        appointment.markNoShow(START.plusSeconds(600));
+        assertThat(appointment.getStatus()).isEqualTo(AppointmentStatus.NO_SHOW);
+
+        appointment.markArrived();
+        assertThat(appointment.getStatus()).isEqualTo(AppointmentStatus.ARRIVED);
     }
 
     private static Appointment booked() {

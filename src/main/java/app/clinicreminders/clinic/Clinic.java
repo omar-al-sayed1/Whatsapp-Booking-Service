@@ -88,6 +88,11 @@ public class Clinic {
         this.reminderH2Enabled = h2Enabled;
     }
 
+    /** The language new patients get until they choose. */
+    public void changeDefaultLanguage(Language language) {
+        this.defaultLanguage = language;
+    }
+
     public Long getId() {
         return id;
     }

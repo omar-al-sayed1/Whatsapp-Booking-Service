@@ -9,6 +9,7 @@ import java.time.LocalTime;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import app.clinicreminders.appointment.Appointment;
+import app.clinicreminders.appointment.AppointmentEvents.CancelledBy;
 import app.clinicreminders.appointment.AppointmentRepository;
 import app.clinicreminders.appointment.AppointmentSource;
 import app.clinicreminders.clinic.Clinic;
@@ -110,7 +111,7 @@ public class TestData {
     public Appointment cancelledAppointment(Doctor doctor, Patient patient, Instant start, Duration length) {
         Appointment appointment = new Appointment(doctor.getClinicId(), doctor.getId(), patient.getId(), start,
                 start.plus(length), AppointmentSource.WHATSAPP);
-        appointment.cancel(start.minus(Duration.ofDays(1)));
+        appointment.cancel(start.minus(Duration.ofDays(1)), CancelledBy.PATIENT);
         return appointments.save(appointment);
     }
 

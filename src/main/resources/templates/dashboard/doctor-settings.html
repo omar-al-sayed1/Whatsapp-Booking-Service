@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'settings', ~{::main})}">
+<head><title th:text="${doctor.displayName}">Dr. Khoury</title></head>
+<body>
+<main class="container narrow">
+    <p><a th:href="@{/settings}" th:text="#{action.back}">Back</a></p>
+    <h1 th:text="${doctor.displayName}">Dr. Khoury</h1>
+
+    <section class="card">
+        <form method="post" th:action="@{/settings/doctors/{id}(id=${doctor.id})}" class="stack">
+            <label><span th:text="#{settings.doctor.name}">Name</span>
+                <input type="text" name="displayName" th:value="${doctor.displayName}" required></label>
+            <label><span th:text="#{settings.doctor.slot}">Slot length</span>
+                <input type="number" name="slotMinutes" th:value="${doctor.slotMinutes}" min="5" max="240" step="5" required></label>
+            <label class="check">
+                <input type="checkbox" name="active" value="true" th:checked="${doctor.active}">
+                <span th:text="#{settings.doctor.active}">Taking appointments</span>
+            </label>
+            <div class="buttons"><button type="submit" class="primary" th:text="#{action.save}">Save</button></div>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2 th:text="#{settings.hours}">Weekly hours</h2>
+        <table class="list">
+            <tbody>
+            <tr th:each="day : ${week}">
+                <th scope="row" th:text="${day.day()}">Monday</th>
+                <td>
+                    <span class="muted" th:if="${day.windows().isEmpty()}" th:text="#{settings.hours.closed}">Closed</span>
+                    <span class="window" th:each="w : ${day.windows()}">
+                        <span th:text="${w.hours()}" dir="auto">9:00 AM – 1:00 PM</span>
+                        <form method="post" class="inline" th:action="@{/settings/hours/{rule}/delete(rule=${w.id()})}">
+                            <input type="hidden" name="doctorId" th:value="${doctor.id}">
+                            <button type="submit" class="link danger" th:aria-label="#{action.delete}">×</button>
+                        </form>
+                    </span>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+        <h3 th:text="#{settings.hours.add}">Add hours</h3>
+        <form method="post" th:action="@{/settings/doctors/{id}/hours(id=${doctor.id})}" class="row">
+            <label><span th:text="#{settings.day}">Day</span>
+                <select name="day">
+                    <option th:each="d : ${weekdays}" th:value="${d[0]}" th:text="${d[1]}">Monday</option>
+                </select></label>
+            <label><span th:text="#{settings.from}">From</span><input type="time" name="start" value="09:00" required></label>
+            <label><span th:text="#{settings.to}">To</span><input type="time" name="end" value="13:00" required></label>
+            <button type="submit" th:text="#{action.add}">Add</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2 th:text="#{settings.days}">Days off and special hours</h2>
+        <p class="muted" th:if="${daysOff.isEmpty()}" th:text="#{settings.days.none}">None coming up.</p>
+        <table class="list" th:unless="${daysOff.isEmpty()}">
+            <tbody>
+            <tr th:each="d : ${daysOff}">
+                <td th:text="${d.date()}">Wednesday 25 December 2026</td>
+                <td th:text="${d.hours()} ?: #{settings.days.closed}" dir="auto">Closed all day</td>
+                <td class="actions">
+                    <form method="post" th:action="@{/settings/days/{id}/delete(id=${d.id()})}">
+                        <input type="hidden" name="doctorId" th:value="${doctor.id}">
+                        <button type="submit" class="danger" th:text="#{action.delete}">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+        <h3 th:text="#{settings.days.add}">Add a day</h3>
+        <form method="post" th:action="@{/settings/doctors/{id}/days(id=${doctor.id})}" class="row">
+            <label><span th:text="#{settings.date}">Date</span>
+                <input type="date" name="date" th:min="${today}" required></label>
+            <label class="check"><input type="checkbox" name="closed" value="true" checked>
+                <span th:text="#{settings.days.closed}">Closed all day</span></label>
+            <label><span th:text="#{settings.from}">From</span><input type="time" name="start"></label>
+            <label><span th:text="#{settings.to}">To</span><input type="time" name="end"></label>
+            <button type="submit" th:text="#{action.add}">Add</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

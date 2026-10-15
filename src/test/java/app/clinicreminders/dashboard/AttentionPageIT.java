@@ -1,0 +1,92 @@
+package app.clinicreminders.dashboard;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+
+import app.clinicreminders.appointment.Appointment;
+import app.clinicreminders.booking.Conversation;
+import app.clinicreminders.booking.ConversationRepository;
+import app.clinicreminders.booking.ConversationState;
+import app.clinicreminders.clinic.Clinic;
+import app.clinicreminders.common.Language;
+import app.clinicreminders.patient.Patient;
+import app.clinicreminders.staff.StaffPrincipal;
+import app.clinicreminders.whatsapp.OutboundMessage.TemplateMessage;
+import app.clinicreminders.whatsapp.WhatsAppException;
+import app.clinicreminders.whatsapp.WhatsAppMessenger;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+class AttentionPageIT extends DashboardTest {
+
+    @Autowired
+    ConversationRepository conversations;
+
+    @Autowired
+    WhatsAppMessenger messenger;
+
+    private Clinic clinic;
+    private Patient rana;
+    private StaffPrincipal staff;
+
+    @BeforeEach
+    void clinicWithPatient() {
+        clinic = data.connectedClinic("A", "pn-a");
+        rana = data.patient(clinic, "Rana", "+96170123456", Language.AR);
+        staff = secretaryOf(clinic);
+    }
+
+    @Test
+    void listsPatientsWaitingForACallAndFailedMessages() {
+        flagged(clinic, "+96170123456");
+        Appointment appointment = data.appointment(data.doctor(clinic, 30), rana, Instant.parse("2026-11-03T08:30:00Z"),
+                Duration.ofMinutes(30));
+        whatsApp.failNext(WhatsAppException.fromMetaError(131026, "Message undeliverable"));
+        messenger.send(clinic.getId(), new TemplateMessage("+96170123456", "appointment_reminder", "ar", List.of()),
+                appointment.getId());
+        Clinic other = data.clinic("B");
+        flagged(other, "+96171000000");
+
+        assertThat(get(staff, "/attention")).hasStatusOk().bodyText()
+                .contains("Rana", "+96170123456", "Message undeliverable (131026)", "Reminder")
+                .doesNotContain("+96171000000");
+    }
+
+    @Test
+    void failuresOlderThanAWeekDropOff() {
+        whatsApp.failNext(WhatsAppException.fromMetaError(131026, "Message undeliverable"));
+        messenger.send(clinic.getId(), new TemplateMessage("+96170123456", "appointment_reminder", "ar", List.of()), null);
+        // Eight days before the test clock's "now" (14 October 2026).
+        jdbc.update("update message_log set created_at = '2026-10-06T08:00:00Z'");
+
+        assertThat(get(staff, "/attention")).bodyText().contains("No failed messages.");
+    }
+
+    @Test
+    void markingAConversationDoneTakesItOffTheList() {
+        Conversation conversation = flagged(clinic, "+96170123456");
+
+        assertThat(post(staff, "/attention/conversations/{id}/handled", conversation.getId())).hasStatus3xxRedirection();
+
+        assertThat(conversations.findByClinicIdAndNeedsHumanTrueOrderByUpdatedAtDesc(clinic.getId())).isEmpty();
+        assertThat(get(staff, "/attention")).bodyText().contains("Nobody is waiting.");
+    }
+
+    @Test
+    void anotherClinicsConversationCannotBeTouched() {
+        Conversation theirs = flagged(data.clinic("B"), "+96171000000");
+
+        assertThat(post(staff, "/attention/conversations/{id}/handled", theirs.getId())).hasStatus(404);
+    }
+
+    private Conversation flagged(Clinic owner, String phone) {
+        Conversation conversation = new Conversation(owner.getId(), phone, ConversationState.MENU,
+                Instant.parse("2026-10-14T09:30:00Z"));
+        conversation.flagForHuman();
+        return conversations.save(conversation);
+    }
+}

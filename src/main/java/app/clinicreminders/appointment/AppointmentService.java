@@ -75,8 +75,16 @@ public class AppointmentService {
     }
 
     public void cancel(long clinicId, long appointmentId, CancelledBy by) {
-        find(clinicId, appointmentId).cancel(clock.instant());
+        find(clinicId, appointmentId).cancel(clock.instant(), by);
         events.publishEvent(new Cancelled(clinicId, appointmentId, by));
+    }
+
+    public void markArrived(long clinicId, long appointmentId) {
+        find(clinicId, appointmentId).markArrived();
+    }
+
+    public void markNoShow(long clinicId, long appointmentId) {
+        find(clinicId, appointmentId).markNoShow(clock.instant());
     }
 
     private Appointment find(long clinicId, long appointmentId) {

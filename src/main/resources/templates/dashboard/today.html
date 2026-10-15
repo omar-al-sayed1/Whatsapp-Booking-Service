@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'today', ~{::main})}">
+<head><title th:text="#{today.title}">Today</title></head>
+<body>
+<main class="container">
+    <div class="toolbar">
+        <div>
+            <h1 th:text="${dateLabel}">Tuesday 3 November 2026</h1>
+            <p class="muted small" th:text="#{today.refreshes}">Updates every 30 seconds</p>
+        </div>
+        <nav class="day-nav">
+            <a class="button" th:href="@{/(date=${previousDate})}" th:text="#{today.previous}">Previous day</a>
+            <a class="button" th:unless="${isToday}" th:href="@{/}" th:text="#{today.today}">Today</a>
+            <a class="button" th:href="@{/(date=${nextDate})}" th:text="#{today.next}">Next day</a>
+        </nav>
+        <a class="button primary" th:href="@{/appointments/new(date=${date})}" th:text="#{today.add}">Add appointment</a>
+    </div>
+    <section th:replace="~{dashboard/today-list :: list}"></section>
+</main>
+</body>
+</html>

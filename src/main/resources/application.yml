@@ -19,6 +19,11 @@ spring:
   messages:
     basename: messages
     fallback-to-system-locale: false
+  # Dates and times in URLs and forms are ISO (2026-10-21, 09:30), never locale-styled.
+  mvc:
+    format:
+      date: iso
+      time: iso
 
 management:
   endpoints:

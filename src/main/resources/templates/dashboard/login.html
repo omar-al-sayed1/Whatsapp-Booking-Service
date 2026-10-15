@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'login', ~{::main})}">
+<head><title th:text="#{login.title}">Sign in</title></head>
+<body>
+<main class="container narrow">
+    <div class="card login">
+        <h1 th:text="#{app.name}">Clinic Reminders</h1>
+        <p class="alert" role="alert" th:if="${param.error}" th:text="#{login.error}">Wrong username or password.</p>
+        <p class="notice" role="status" th:if="${param.logout}" th:text="#{login.logged-out}">Signed out.</p>
+        <form method="post" th:action="@{/login}" class="stack">
+            <label>
+                <span th:text="#{login.username}">Username</span>
+                <input type="text" name="username" autocomplete="username" required autofocus dir="ltr">
+            </label>
+            <label>
+                <span th:text="#{login.password}">Password</span>
+                <input type="password" name="password" autocomplete="current-password" required dir="ltr">
+            </label>
+            <button type="submit" class="primary" th:text="#{login.submit}">Sign in</button>
+        </form>
+        <p class="switch-language">
+            <a th:href="@{/login(lang=${otherLang})}" th:lang="${otherLang}" th:text="#{'language.switch.' + ${otherLang}}">English</a>
+        </p>
+    </div>
+</main>
+</body>
+</html>
