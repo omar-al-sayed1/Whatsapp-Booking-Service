@@ -1,0 +1,57 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "102290129340398",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "96181000000",
+              "phone_number_id": "106540352242922"
+            },
+            "statuses": [
+              {
+                "id": "wamid.TEMPLATE-REMINDER-1",
+                "status": "delivered",
+                "timestamp": "1792065000",
+                "recipient_id": "96170123456",
+                "recipient_user_id": "LB.13491208655302741918",
+                "pricing": {
+                  "billable": true,
+                  "pricing_model": "PMP",
+                  "type": "regular",
+                  "category": "utility"
+                }
+              },
+              {
+                "id": "wamid.TEMPLATE-REMINDER-2",
+                "status": "failed",
+                "timestamp": "1792065010",
+                "recipient_id": "96170999999",
+                "recipient_user_id": "LB.55555555555555555555",
+                "errors": [
+                  {
+                    "code": 131026,
+                    "title": "Message undeliverable",
+                    "message": "Message undeliverable",
+                    "error_data": { "details": "Message Undeliverable." },
+                    "href": "https://developers.facebook.com/docs/whatsapp/cloud-api/support/error-codes/"
+                  }
+                ]
+              },
+              {
+                "id": "wamid.VOICE-1",
+                "status": "played",
+                "timestamp": "1792065020",
+                "recipient_id": "96170123456"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

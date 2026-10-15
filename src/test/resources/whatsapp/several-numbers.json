@@ -1,0 +1,41 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "111111111111111",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": { "display_phone_number": "96181000001", "phone_number_id": "PHONE-A" },
+            "contacts": [{ "profile": { "name": "A" }, "wa_id": "96170000001" }],
+            "messages": [
+              { "from": "96170000001", "id": "wamid.A-1", "timestamp": "1792065100", "type": "text", "text": { "body": "hi A" } }
+            ]
+          }
+        },
+        {
+          "field": "message_template_status_update",
+          "value": { "event": "APPROVED", "message_template_name": "appointment_reminder" }
+        }
+      ]
+    },
+    {
+      "id": "222222222222222",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": { "display_phone_number": "96181000002", "phone_number_id": "PHONE-B" },
+            "contacts": [{ "profile": { "name": "B" }, "wa_id": "96170000002" }],
+            "messages": [
+              { "from": "96170000002", "id": "wamid.B-1", "timestamp": "1792065110", "type": "text", "text": { "body": "hi B" } }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

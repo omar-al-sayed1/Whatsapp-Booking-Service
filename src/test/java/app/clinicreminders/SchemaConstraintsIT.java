@@ -182,6 +182,29 @@ class SchemaConstraintsIT extends IntegrationTest {
                 .isInstanceOf(DuplicateKeyException.class);
     }
 
+    @Test
+    void inboundMessagesWeDontHandleAreLoggedAsOther() {
+        long clinic = clinic();
+        String insert = "insert into message_log (clinic_id, direction, wa_message_id, kind) values (?, 'IN', ?, ?)";
+
+        assertThatCode(() -> jdbc.update(insert, clinic, "wamid.1", "OTHER")).doesNotThrowAnyException();
+        assertThatThrownBy(() -> jdbc.update(insert, clinic, "wamid.2", "VIDEO"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void aWhatsAppUserIdBelongsToOnePatientPerClinic() {
+        long clinicA = clinic();
+        long patient = patient(clinicA);
+        long other = patient(clinicA);
+        jdbc.update("update patient set wa_user_id = 'LB.1' where id = ?", patient);
+
+        assertThatThrownBy(() -> jdbc.update("update patient set wa_user_id = 'LB.1' where id = ?", other))
+                .isInstanceOf(DuplicateKeyException.class);
+        assertThatCode(() -> jdbc.update("update patient set wa_user_id = 'LB.1' where id = ?", patient(clinic())))
+                .doesNotThrowAnyException();
+    }
+
     // --- plain SQL fixtures ---
 
     private long clinic() {

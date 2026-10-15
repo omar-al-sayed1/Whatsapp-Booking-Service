@@ -12,6 +12,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.Generated;
+import org.jspecify.annotations.Nullable;
 
 /** The tenant. Every tenant-owned row carries this clinic's id. */
 @Entity
@@ -69,6 +70,16 @@ public class Clinic {
         this.name = name;
         this.timezone = timezone;
         this.defaultLanguage = defaultLanguage;
+    }
+
+    /**
+     * Links the clinic to its WhatsApp number. The token must already be encrypted with
+     * {@code TokenCipher} for this clinic's id; null leaves the clinic without a token.
+     */
+    public void connectWhatsApp(String phoneNumberId, String businessAccountId, byte @Nullable [] encryptedAccessToken) {
+        this.waPhoneNumberId = phoneNumberId;
+        this.waBusinessAccountId = businessAccountId;
+        this.waAccessTokenEncrypted = encryptedAccessToken;
     }
 
     public Long getId() {

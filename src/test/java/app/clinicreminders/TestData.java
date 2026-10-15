@@ -1,5 +1,6 @@
 package app.clinicreminders;
 
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
@@ -22,6 +23,9 @@ import app.clinicreminders.scheduling.ScheduleExceptionRepository;
 import app.clinicreminders.scheduling.ScheduleRule;
 import app.clinicreminders.scheduling.ScheduleRuleRepository;
 import app.clinicreminders.scheduling.TimeWindow;
+import app.clinicreminders.whatsapp.MessageRate;
+import app.clinicreminders.whatsapp.MessageRateRepository;
+import app.clinicreminders.whatsapp.TokenCipher;
 
 /** Saves test fixtures through the real repositories. */
 public class TestData {
@@ -33,19 +37,36 @@ public class TestData {
     private final ScheduleExceptionRepository exceptions;
     private final PatientRepository patients;
     private final AppointmentRepository appointments;
+    private final MessageRateRepository rates;
+    private final TokenCipher tokenCipher;
 
     TestData(ClinicRepository clinics, DoctorRepository doctors, ScheduleRuleRepository rules,
-             ScheduleExceptionRepository exceptions, PatientRepository patients, AppointmentRepository appointments) {
+             ScheduleExceptionRepository exceptions, PatientRepository patients, AppointmentRepository appointments,
+             MessageRateRepository rates, TokenCipher tokenCipher) {
         this.clinics = clinics;
         this.doctors = doctors;
         this.rules = rules;
         this.exceptions = exceptions;
         this.patients = patients;
         this.appointments = appointments;
+        this.rates = rates;
+        this.tokenCipher = tokenCipher;
     }
 
     public Clinic clinic(String name) {
         return clinics.save(new Clinic(name, Clinic.DEFAULT_ZONE, Language.AR));
+    }
+
+    /** A clinic connected to WhatsApp, with the token "token-{phoneNumberId}" encrypted for it. */
+    public Clinic connectedClinic(String name, String phoneNumberId) {
+        Clinic clinic = clinic(name);
+        clinic.connectWhatsApp(phoneNumberId, "waba-" + phoneNumberId,
+                tokenCipher.encrypt(clinic.getId(), "token-" + phoneNumberId));
+        return clinics.save(clinic);
+    }
+
+    public MessageRate rate(String market, String category, String usd, LocalDate validFrom) {
+        return rates.save(new MessageRate(market, category, new BigDecimal(usd), validFrom));
     }
 
     public Doctor doctor(Clinic clinic, int slotMinutes) {
@@ -67,6 +88,10 @@ public class TestData {
     public Patient patient(Clinic clinic) {
         String phone = "+96170%06d".formatted(phoneSequence.incrementAndGet());
         return patients.save(new Patient(clinic.getId(), "Test Patient", phone, Language.AR));
+    }
+
+    public Patient patient(Clinic clinic, String phoneE164) {
+        return patients.save(new Patient(clinic.getId(), "Test Patient", phoneE164, Language.AR));
     }
 
     public Appointment appointment(Doctor doctor, Patient patient, Instant start, Duration length) {

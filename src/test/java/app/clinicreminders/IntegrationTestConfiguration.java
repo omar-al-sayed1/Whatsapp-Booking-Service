@@ -18,4 +18,10 @@ class IntegrationTestConfiguration {
     MutableClock testClock() {
         return new MutableClock(IntegrationTest.DEFAULT_NOW);
     }
+
+    @Bean
+    @Primary
+    RecordingSleeper recordingSleeper() {
+        return new RecordingSleeper();
+    }
 }

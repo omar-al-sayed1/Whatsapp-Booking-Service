@@ -1,0 +1,36 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "102290129340398",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "96181000000",
+              "phone_number_id": "106540352242922"
+            },
+            "contacts": [
+              { "profile": { "name": "Rana Haddad" }, "wa_id": "96170123456" }
+            ],
+            "messages": [
+              {
+                "context": {
+                  "from": "96181000000",
+                  "id": "wamid.TEMPLATE-REMINDER-1"
+                },
+                "from": "96170123456",
+                "id": "wamid.QUICK-REPLY-1",
+                "timestamp": "1792064700",
+                "type": "button",
+                "button": { "payload": "تأكيد", "text": "تأكيد" }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

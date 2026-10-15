@@ -16,6 +16,7 @@ import app.clinicreminders.booking.Conversation;
 import app.clinicreminders.booking.ConversationState;
 import app.clinicreminders.clinic.Clinic;
 import app.clinicreminders.common.Language;
+import app.clinicreminders.patient.Patient;
 import app.clinicreminders.reminder.Reminder;
 import app.clinicreminders.reminder.ReminderKind;
 import app.clinicreminders.reminder.ReminderStatus;
@@ -29,6 +30,7 @@ import app.clinicreminders.whatsapp.MessageDirection;
 import app.clinicreminders.whatsapp.MessageKind;
 import app.clinicreminders.whatsapp.MessageLog;
 import app.clinicreminders.whatsapp.MessageRate;
+import app.clinicreminders.whatsapp.MessageStatus;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -136,17 +138,40 @@ class EntityMappingIT extends IntegrationTest {
     void messageLogAndRate() {
         Clinic clinic = data.clinic("Clinic");
 
-        MessageLog log = saveAndReload(
-                new MessageLog(clinic.getId(), null, MessageDirection.IN, MessageKind.BUTTON_REPLY, "wamid.test-1"),
-                MessageLog::getId);
+        MessageLog sent = saveAndReload(MessageLog.sent(clinic.getId(), null, MessageKind.TEMPLATE,
+                "appointment_reminder", "wamid.test-1", "utility", new BigDecimal("0.0110")), MessageLog::getId);
+        MessageLog failed = saveAndReload(MessageLog.failed(clinic.getId(), null, MessageKind.TEXT, null,
+                131026, "Message undeliverable"), MessageLog::getId);
         MessageRate rate = saveAndReload(
                 new MessageRate("LB", "utility", new BigDecimal("0.012300"), LocalDate.of(2026, 10, 1)), MessageRate::getId);
 
-        assertThat(log.getDirection()).isEqualTo(MessageDirection.IN);
-        assertThat(log.getKind()).isEqualTo(MessageKind.BUTTON_REPLY);
-        assertThat(log.getWaMessageId()).isEqualTo("wamid.test-1");
-        assertThat(log.getStatus()).isNull();
+        assertThat(sent.getDirection()).isEqualTo(MessageDirection.OUT);
+        assertThat(sent.getKind()).isEqualTo(MessageKind.TEMPLATE);
+        assertThat(sent.getTemplateName()).isEqualTo("appointment_reminder");
+        assertThat(sent.getWaMessageId()).isEqualTo("wamid.test-1");
+        assertThat(sent.getStatus()).isEqualTo(MessageStatus.SENT);
+        assertThat(sent.getPricingCategory()).isEqualTo("utility");
+        assertThat(sent.getEstCostUsd()).isEqualByComparingTo("0.0110");
+        assertThat(sent.getCreatedAt()).isNotNull();
+        assertThat(failed.getStatus()).isEqualTo(MessageStatus.FAILED);
+        assertThat(failed.getWaMessageId()).isNull();
+        assertThat(failed.getErrorCode()).isEqualTo(131026);
+        assertThat(failed.getErrorTitle()).isEqualTo("Message undeliverable");
         assertThat(rate.getUsdPerMessage()).isEqualByComparingTo("0.0123");
+    }
+
+    @Test
+    void patientWithWhatsAppUserIdAndOptOut() {
+        Clinic clinic = data.clinic("Clinic");
+        Patient patient = new Patient(clinic.getId(), "Rana", "+96170123456", Language.AR);
+        patient.linkWhatsAppUser("LB.13491208655302741918");
+        patient.optOut();
+
+        Patient reloaded = saveAndReload(patient, Patient::getId);
+
+        assertThat(reloaded.getWaUserId()).isEqualTo("LB.13491208655302741918");
+        assertThat(reloaded.isOptedOut()).isTrue();
+        assertThat(reloaded.getLanguage()).isEqualTo(Language.AR);
     }
 
     @Test

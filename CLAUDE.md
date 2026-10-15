@@ -35,6 +35,8 @@ If a library isn't compatible with Spring Boot 4 yet, tell me before downgrading
 - Run all tests: `./mvnw verify` (needs Docker: `*IT` classes use Testcontainers)
 - Unit tests only, no Docker: `./mvnw test` (`*Test` classes)
 - Health check: `http://localhost:8080/actuator/health`
+- WhatsApp simulator (dev profile only): `http://localhost:8080/dev/whatsapp`
+- Webhook URL to register with Meta: `{APP_BASE_URL}/webhooks/whatsapp` (verify token = `WA_VERIFY_TOKEN`)
 - On Windows use `mvnw.cmd` from cmd/PowerShell, or `./mvnw` from Git Bash; `JAVA_HOME` must point to
   JDK 21+ (CI uses Temurin 21).
 
@@ -54,8 +56,8 @@ views), `report`, `common`.
 - **Time:** store `timestamptz` in UTC; compute and display in the clinic's zone (default
   `Asia/Beirut`). Lebanon observes daylight saving time, so slot and reminder logic must be tested
   across the changeover.
-- **Privacy:** store only the patient's name, phone (E.164), language preference and appointment
-  times. Never store medical notes, diagnoses or reasons for visit. Patients can be deleted on
+- **Privacy:** store only the patient's name, phone (E.164), WhatsApp business-scoped user ID
+  (needed when a webhook omits the phone number), language preference and appointment times. Never store medical notes, diagnoses or reasons for visit. Patients can be deleted on
   request.
 - **Secrets:** never commit tokens. Per-clinic WhatsApp access tokens are encrypted at rest
   (AES-GCM, key from an environment variable). All configuration comes from environment variables.

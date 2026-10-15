@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WhatsApp simulator</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 1.5rem; color: #1d2433; background: #f6f7f9; }
+        h1 { font-size: 1.3rem; margin: 0 0 .25rem; }
+        h2 { font-size: 1rem; margin: 1.5rem 0 .5rem; }
+        p.hint { color: #5b6475; margin: 0 0 1rem; }
+        section { background: #fff; border: 1px solid #dde1e8; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+        form.inline { display: inline; }
+        label { margin-right: .75rem; }
+        input[type=text] { padding: .3rem .4rem; }
+        button { padding: .3rem .6rem; cursor: pointer; }
+        table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+        th, td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid #e6e9ee; vertical-align: top; }
+        th { color: #5b6475; font-weight: 600; }
+        .status { font-weight: 600; }
+        .muted { color: #8a93a3; font-size: .8rem; }
+        .rtl { direction: rtl; unicode-bidi: plaintext; }
+    </style>
+</head>
+<body>
+<h1>WhatsApp simulator</h1>
+<p class="hint">Dev profile only. The fake client keeps the last 200 messages in memory; patient replies go
+    through the real webhook inbox.</p>
+
+<section>
+    <h2>Send as the clinic</h2>
+    <p th:if="${clinics.isEmpty()}">No clinic is connected to WhatsApp. Restart with the dev profile to create one.</p>
+    <form th:unless="${clinics.isEmpty()}" method="post" th:action="@{/dev/whatsapp/send}">
+        <label>Clinic
+            <select name="clinicId">
+                <option th:each="c : ${clinics}" th:value="${c.id}" th:text="${c.name}">Clinic</option>
+            </select>
+        </label>
+        <label>To <input type="text" name="to" value="+96170000001" size="14"></label>
+        <label>Text <input type="text" name="text" size="40" required></label>
+        <button type="submit">Send text</button>
+    </form>
+    <form th:unless="${clinics.isEmpty()}" method="post" th:action="@{/dev/whatsapp/send-buttons}" style="margin-top:.5rem">
+        <label>Clinic
+            <select name="clinicId">
+                <option th:each="c : ${clinics}" th:value="${c.id}" th:text="${c.name}">Clinic</option>
+            </select>
+        </label>
+        <label>To <input type="text" name="to" value="+96170000001" size="14"></label>
+        <label>Text <input type="text" name="text" size="24" required></label>
+        <input type="text" name="titles" value="Yes" size="8" maxlength="20">
+        <input type="text" name="titles" value="No" size="8" maxlength="20">
+        <input type="text" name="titles" value="" size="8" maxlength="20">
+        <button type="submit">Send buttons</button>
+    </form>
+    <div style="margin-top:.5rem">
+        Next send fails:
+        <form class="inline" method="post" th:action="@{/dev/whatsapp/fail-next}">
+            <button name="kind" value="retryable">3 × rate limit (130429)</button>
+            <button name="kind" value="permanent">undeliverable (131026)</button>
+        </form>
+    </div>
+</section>
+
+<section th:unless="${clinics.isEmpty()}">
+    <h2>Reply as a patient</h2>
+    <form method="post" th:action="@{/dev/whatsapp/reply}">
+        <label>Clinic
+            <select name="clinicId">
+                <option th:each="c : ${clinics}" th:value="${c.id}" th:text="${c.name}">Clinic</option>
+            </select>
+        </label>
+        <label>From <input type="text" name="from" value="+96170000001" size="14"></label>
+        <label>Name <input type="text" name="profileName" value="Dev Patient" size="12"></label>
+        <label>Text <input type="text" name="text" size="30" required placeholder="Hello / STOP / توقف"></label>
+        <button type="submit">Send reply</button>
+    </form>
+</section>
+
+<section>
+    <h2>Sent messages</h2>
+    <p th:if="${rows.isEmpty()}" class="muted">Nothing sent yet.</p>
+    <table th:unless="${rows.isEmpty()}">
+        <thead>
+        <tr><th>Sent</th><th>Clinic → patient</th><th>Message</th><th>Status</th><th>Simulate</th></tr>
+        </thead>
+        <tbody>
+        <tr th:each="r : ${rows}">
+            <td><span th:text="${r.sentAt()}">time</span><br><span class="muted" th:text="${r.waMessageId()}">wamid</span></td>
+            <td><span th:text="${r.clinic()}">clinic</span><br><span th:text="${r.to()}">to</span></td>
+            <td><span class="muted" th:text="${r.kind()}">kind</span><br><span class="rtl" th:text="${r.content()}">content</span></td>
+            <td class="status" th:text="${r.status()}">SENT</td>
+            <td>
+                <form class="inline" method="post" th:action="@{/dev/whatsapp/tap}" th:each="label : ${r.quickReplies()}">
+                    <input type="hidden" name="waMessageId" th:value="${r.waMessageId()}">
+                    <button name="label" th:value="${label}" th:text="'Tap ' + ${label}">Tap</button>
+                </form>
+                <form class="inline" method="post" th:action="@{/dev/whatsapp/tap}" th:each="b : ${r.buttons()}">
+                    <input type="hidden" name="waMessageId" th:value="${r.waMessageId()}">
+                    <input type="hidden" name="buttonTitle" th:value="${b.title()}">
+                    <button name="buttonId" th:value="${b.id()}" th:text="'Tap ' + ${b.title()}">Tap</button>
+                </form>
+                <form class="inline" method="post" th:action="@{/dev/whatsapp/status}">
+                    <input type="hidden" name="waMessageId" th:value="${r.waMessageId()}">
+                    <button name="status" value="delivered">Delivered</button>
+                    <button name="status" value="read">Read</button>
+                    <button name="status" value="failed">Failed</button>
+                </form>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+</section>
+</body>
+</html>

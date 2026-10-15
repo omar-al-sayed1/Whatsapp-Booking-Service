@@ -12,8 +12,8 @@ import jakarta.persistence.Table;
 import org.hibernate.annotations.Generated;
 
 /**
- * Privacy: name, phone, language and opt-out only. Never add medical notes, diagnoses or reasons
- * for visit.
+ * Privacy: name, phone, WhatsApp user id, language and opt-out only. Never add medical notes,
+ * diagnoses or reasons for visit.
  */
 @Entity
 @Table(name = "patient")
@@ -30,6 +30,10 @@ public class Patient {
 
     @Column(name = "phone_e164")
     private String phoneE164;
+
+    /** Meta's business-scoped user id (BSUID), learned from webhooks. */
+    @Column(name = "wa_user_id")
+    private String waUserId;
 
     private Language language;
 
@@ -50,6 +54,16 @@ public class Patient {
         this.language = language;
     }
 
+    /** Replied STOP: never message this patient again. */
+    public void optOut() {
+        this.optedOut = true;
+    }
+
+    /** Meta regenerates the id when the user changes number, so the latest one wins. */
+    public void linkWhatsAppUser(String waUserId) {
+        this.waUserId = waUserId;
+    }
+
     public Long getId() {
         return id;
     }
@@ -64,6 +78,10 @@ public class Patient {
 
     public String getPhoneE164() {
         return phoneE164;
+    }
+
+    public String getWaUserId() {
+        return waUserId;
     }
 
     public Language getLanguage() {

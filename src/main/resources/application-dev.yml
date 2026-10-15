@@ -4,3 +4,9 @@ spring:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/clinicreminders}
     username: ${DATABASE_USER:clinicreminders}
     password: ${DATABASE_PASSWORD:clinicreminders}
+
+# Fake client: nothing leaves the machine. Simulate patients at http://localhost:8080/dev/whatsapp
+whatsapp:
+  client: fake
+  app-secret: ${WA_APP_SECRET:dev-app-secret}
+  verify-token: ${WA_VERIFY_TOKEN:dev-verify-token}

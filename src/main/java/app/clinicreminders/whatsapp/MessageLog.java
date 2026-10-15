@@ -12,10 +12,12 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.Generated;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One row per WhatsApp message in or out. Holds no message body and no phone number, so deleting
- * a patient leaves nothing identifying here. Mapping only; behaviour arrives in M2.
+ * a patient leaves nothing identifying here. Inbound rows are inserted by
+ * {@link MessageLogRepository#insertInboundIfNew}, which also dedupes webhook deliveries.
  */
 @Entity
 @Table(name = "message_log")
@@ -34,7 +36,7 @@ public class MessageLog {
     @Enumerated(EnumType.STRING)
     private MessageDirection direction;
 
-    /** Unique; the webhook dedupes on it. */
+    /** Unique; the webhook dedupes on it. Null when a send failed before Meta assigned one. */
     @Column(name = "wa_message_id")
     private String waMessageId;
 
@@ -53,6 +55,12 @@ public class MessageLog {
     @Column(name = "est_cost_usd")
     private BigDecimal estCostUsd;
 
+    @Column(name = "error_code")
+    private Integer errorCode;
+
+    @Column(name = "error_title")
+    private String errorTitle;
+
     @Generated
     @Column(name = "created_at")
     private Instant createdAt;
@@ -60,13 +68,50 @@ public class MessageLog {
     protected MessageLog() {
     }
 
-    public MessageLog(long clinicId, Long appointmentId, MessageDirection direction, MessageKind kind,
-                      String waMessageId) {
+    private MessageLog(long clinicId, @Nullable Long appointmentId, MessageKind kind, @Nullable String templateName) {
         this.clinicId = clinicId;
         this.appointmentId = appointmentId;
-        this.direction = direction;
+        this.direction = MessageDirection.OUT;
         this.kind = kind;
-        this.waMessageId = waMessageId;
+        this.templateName = templateName;
+    }
+
+    public static MessageLog sent(long clinicId, @Nullable Long appointmentId, MessageKind kind,
+                                  @Nullable String templateName, String waMessageId,
+                                  @Nullable String pricingCategory, @Nullable BigDecimal estCostUsd) {
+        MessageLog log = new MessageLog(clinicId, appointmentId, kind, templateName);
+        log.waMessageId = waMessageId;
+        log.status = MessageStatus.SENT;
+        log.pricingCategory = pricingCategory;
+        log.estCostUsd = estCostUsd;
+        return log;
+    }
+
+    public static MessageLog failed(long clinicId, @Nullable Long appointmentId, MessageKind kind,
+                                    @Nullable String templateName, @Nullable Integer errorCode, String errorTitle) {
+        MessageLog log = new MessageLog(clinicId, appointmentId, kind, templateName);
+        log.status = MessageStatus.FAILED;
+        log.errorCode = errorCode;
+        log.errorTitle = errorTitle;
+        return log;
+    }
+
+    /** Applies a status webhook. Ignores statuses that would move the message backwards. */
+    public void applyStatus(MessageStatus newStatus, @Nullable Integer errorCode, @Nullable String errorTitle) {
+        if (status != null && !newStatus.isAfter(status)) {
+            return;
+        }
+        status = newStatus;
+        if (newStatus == MessageStatus.FAILED) {
+            this.errorCode = errorCode;
+            this.errorTitle = errorTitle;
+        }
+    }
+
+    /** Meta's own pricing for the message, from a status webhook. */
+    public void reprice(String pricingCategory, @Nullable BigDecimal estCostUsd) {
+        this.pricingCategory = pricingCategory;
+        this.estCostUsd = estCostUsd;
     }
 
     public Long getId() {
@@ -107,6 +152,14 @@ public class MessageLog {
 
     public BigDecimal getEstCostUsd() {
         return estCostUsd;
+    }
+
+    public Integer getErrorCode() {
+        return errorCode;
+    }
+
+    public String getErrorTitle() {
+        return errorTitle;
     }
 
     public Instant getCreatedAt() {
