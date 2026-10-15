@@ -1,0 +1,6 @@
+# Local development against `docker compose up -d db`. These credentials exist only in compose.yaml.
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/clinicreminders}
+    username: ${DATABASE_USER:clinicreminders}
+    password: ${DATABASE_PASSWORD:clinicreminders}
