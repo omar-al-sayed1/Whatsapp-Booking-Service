@@ -94,6 +94,14 @@ public class TestData {
         return patients.save(new Patient(clinic.getId(), "Test Patient", phoneE164, Language.AR));
     }
 
+    public Patient patient(Clinic clinic, String name, String phoneE164, Language language) {
+        return patients.save(new Patient(clinic.getId(), name, phoneE164, language));
+    }
+
+    public Doctor doctor(Clinic clinic, String displayName, int slotMinutes) {
+        return doctors.save(new Doctor(clinic.getId(), displayName, slotMinutes));
+    }
+
     public Appointment appointment(Doctor doctor, Patient patient, Instant start, Duration length) {
         return appointments.save(new Appointment(doctor.getClinicId(), doctor.getId(), patient.getId(), start,
                 start.plus(length), AppointmentSource.MANUAL));

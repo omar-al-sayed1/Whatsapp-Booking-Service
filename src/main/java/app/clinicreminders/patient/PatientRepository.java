@@ -6,6 +6,8 @@ import org.springframework.data.repository.Repository;
 
 public interface PatientRepository extends Repository<Patient, Long> {
 
+    Optional<Patient> findByIdAndClinicId(Long id, Long clinicId);
+
     Optional<Patient> findByClinicIdAndPhoneE164(Long clinicId, String phoneE164);
 
     Optional<Patient> findByClinicIdAndWaUserId(Long clinicId, String waUserId);

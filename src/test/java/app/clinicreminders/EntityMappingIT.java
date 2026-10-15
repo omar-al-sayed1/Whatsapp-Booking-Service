@@ -125,7 +125,7 @@ class EntityMappingIT extends IntegrationTest {
         Appointment appointment = data.appointment(data.doctor(clinic, 30), data.patient(clinic), START, Duration.ofMinutes(30));
 
         Reminder reminder = saveAndReload(
-                new Reminder(clinic.getId(), appointment.getId(), ReminderKind.H24, START.minus(Duration.ofDays(1))),
+                new Reminder(clinic.getId(), appointment.getId(), ReminderKind.H24, START.minus(Duration.ofDays(1)), ReminderStatus.PENDING),
                 Reminder::getId);
 
         assertThat(reminder.getKind()).isEqualTo(ReminderKind.H24);

@@ -64,6 +64,8 @@ class WhatsAppRepositoriesIT extends IntegrationTest {
         patient.linkWhatsAppUser("LB.1");
         patients.save(patient);
 
+        assertThat(patients.findByIdAndClinicId(patient.getId(), clinicA.getId())).isPresent();
+        assertThat(patients.findByIdAndClinicId(patient.getId(), clinicB.getId())).isEmpty();
         assertThat(patients.findByClinicIdAndPhoneE164(clinicA.getId(), "+96170123456")).isPresent();
         assertThat(patients.findByClinicIdAndPhoneE164(clinicB.getId(), "+96170123456")).isEmpty();
         assertThat(patients.findByClinicIdAndWaUserId(clinicA.getId(), "LB.1")).isPresent();

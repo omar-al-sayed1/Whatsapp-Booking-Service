@@ -67,6 +67,15 @@ class AppointmentRepositoryIT extends IntegrationTest {
     }
 
     @Test
+    void anAppointmentIsFoundByIdOnlyInItsClinic() {
+        Appointment appointment = data.appointment(doctor, patient, FROM, HALF_HOUR);
+        Clinic otherClinic = data.clinic("B");
+
+        assertThat(appointments.findByIdAndClinicId(appointment.getId(), clinic.getId())).isPresent();
+        assertThat(appointments.findByIdAndClinicId(appointment.getId(), otherClinic.getId())).isEmpty();
+    }
+
+    @Test
     void neverReturnsAnotherClinicsAppointments() {
         data.appointment(doctor, patient, FROM, HALF_HOUR);
         Clinic otherClinic = data.clinic("B");

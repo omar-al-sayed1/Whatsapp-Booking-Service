@@ -82,6 +82,12 @@ public class Clinic {
         this.waAccessTokenEncrypted = encryptedAccessToken;
     }
 
+    /** Applies to reminders planned from now on; already planned ones are re-checked when due. */
+    public void configureReminders(boolean h24Enabled, boolean h2Enabled) {
+        this.reminderH24Enabled = h24Enabled;
+        this.reminderH2Enabled = h2Enabled;
+    }
+
     public Long getId() {
         return id;
     }

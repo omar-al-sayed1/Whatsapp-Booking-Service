@@ -16,6 +16,9 @@ spring:
           time_zone: UTC
   flyway:
     locations: classpath:db/migration
+  messages:
+    basename: messages
+    fallback-to-system-locale: false
 
 management:
   endpoints:
@@ -41,3 +44,17 @@ whatsapp:
     async: true
     sweep-interval: PT10S
     max-attempts: 5
+
+reminders:
+  scheduler:
+    enabled: true
+    # SPEC asks for every minute; 30 s keeps "sent within 2 minutes of due" comfortably.
+    poll-interval: PT30S
+    batch-size: 50
+  # Language code each template was approved under in Meta, by patient language. Must match exactly.
+  template-language-codes:
+    ar: ar
+    en: en
+  # Quick-reply button labels of the approved reminder templates (SPEC section 6). Must match exactly.
+  confirm-labels: [Confirm, تأكيد]
+  cancel-labels: [Cancel, إلغاء]

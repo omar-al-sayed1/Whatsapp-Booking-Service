@@ -12,7 +12,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.Generated;
 
-/** Mapping only; creation, quiet hours and sending arrive in M3. */
 @Entity
 @Table(name = "reminder")
 public class Reminder {
@@ -36,6 +35,7 @@ public class Reminder {
     @Enumerated(EnumType.STRING)
     private ReminderStatus status;
 
+    /** Times a worker claimed it; with SENDING never re-claimed, this is 0 or 1. */
     private int attempts;
 
     @Column(name = "sent_message_id")
@@ -51,12 +51,22 @@ public class Reminder {
     protected Reminder() {
     }
 
-    public Reminder(long clinicId, long appointmentId, ReminderKind kind, Instant dueAt) {
+    public Reminder(long clinicId, long appointmentId, ReminderKind kind, Instant dueAt, ReminderStatus status) {
         this.clinicId = clinicId;
         this.appointmentId = appointmentId;
         this.kind = kind;
         this.dueAt = dueAt;
-        this.status = ReminderStatus.PENDING;
+        this.status = status;
+    }
+
+    void markSent(String waMessageId, Instant at) {
+        this.status = ReminderStatus.SENT;
+        this.sentMessageId = waMessageId;
+        this.sentAt = at;
+    }
+
+    void finish(ReminderStatus outcome) {
+        this.status = outcome;
     }
 
     public Long getId() {

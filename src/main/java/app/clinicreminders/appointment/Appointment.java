@@ -10,6 +10,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import org.hibernate.annotations.Generated;
 
 /** Start and end are stored per appointment, so changing a doctor's slot length never moves it. */
@@ -50,6 +51,10 @@ public class Appointment {
     @Column(name = "created_at")
     private Instant createdAt;
 
+    /** Optimistic lock: concurrent edits (a patient's tap, a secretary's change) can't overwrite each other. */
+    @Version
+    private int version;
+
     protected Appointment() {
     }
 
@@ -67,9 +72,44 @@ public class Appointment {
         this.status = AppointmentStatus.BOOKED;
     }
 
+    /** Every status except CANCELLED occupies the doctor's time. */
+    public boolean isActive() {
+        return status != AppointmentStatus.CANCELLED;
+    }
+
     public void cancel(Instant now) {
+        requireActive();
         this.status = AppointmentStatus.CANCELLED;
         this.cancelledAt = now;
+    }
+
+    /** @return false if it was already confirmed */
+    public boolean confirm() {
+        if (status == AppointmentStatus.CONFIRMED) {
+            return false;
+        }
+        if (status != AppointmentStatus.BOOKED) {
+            throw new IllegalStateException("Only a booked appointment can be confirmed, not " + status);
+        }
+        this.status = AppointmentStatus.CONFIRMED;
+        return true;
+    }
+
+    /** A moved appointment needs confirming again. */
+    public void reschedule(Instant startsAt, Instant endsAt) {
+        requireActive();
+        if (!startsAt.isBefore(endsAt)) {
+            throw new IllegalArgumentException("startsAt must be before endsAt");
+        }
+        this.startsAt = startsAt;
+        this.endsAt = endsAt;
+        this.status = AppointmentStatus.BOOKED;
+    }
+
+    private void requireActive() {
+        if (!isActive()) {
+            throw new IllegalStateException("Appointment " + id + " is cancelled");
+        }
     }
 
     public Long getId() {
