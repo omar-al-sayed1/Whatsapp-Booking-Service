@@ -75,6 +75,19 @@
                         <span th:text="#{action.save}">Save</span></button>
                 </div>
             </form>
+            <!--/* Deleting: refused while appointments are still to come, so say so instead of offering it. */-->
+            <div class="danger-zone">
+                <form method="post" th:action="@{/doctors/{id}/delete(id=${doctor.id})}" th:if="${upcoming == 0}"
+                      th:data-confirm="#{doctor.delete-confirm(${doctor.displayName})}">
+                    <button type="submit" class="danger"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>
+                        <span th:text="#{doctor.delete}">Delete doctor</span></button>
+                </form>
+                <p class="delete-blocked" th:unless="${upcoming == 0}">
+                    <svg class="icon" aria-hidden="true"><use href="#i-info"/></svg>
+                    <span><span th:text="#{doctor.delete.blocked(${upcoming + ''})}">Upcoming appointments: 3.</span>
+                        <a th:href="@{/week(doctorId=${doctor.id})}" th:text="#{doctor.delete.see-week}">See their week</a></span>
+                </p>
+            </div>
         </section>
 
         <!--/* The doctor's own login: they see only their appointments and patients, and change their hours. */-->

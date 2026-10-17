@@ -70,7 +70,7 @@ public class PatientService {
     }
 
     /** The digits typed, without a leading 0 (03 123 456 is stored as +9613123456); none if fewer than 3. */
-    private static String searchDigits(String query) {
+    static String searchDigits(String query) {
         String digits = query.replaceAll("\\D", "");
         if (digits.startsWith("0")) {
             digits = digits.substring(1);

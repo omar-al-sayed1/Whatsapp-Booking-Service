@@ -26,4 +26,6 @@ public interface StaffUserRepository extends Repository<StaffUser, Long> {
     long countByClinicId(Long clinicId);
 
     StaffUser save(StaffUser user);
+
+    void delete(StaffUser user);
 }

@@ -3,10 +3,14 @@ package app.clinicreminders.dashboard;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.DayOfWeek;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 
 import app.clinicreminders.clinic.Clinic;
 import app.clinicreminders.clinic.ClinicRepository;
+import app.clinicreminders.common.Language;
+import app.clinicreminders.patient.Patient;
 import app.clinicreminders.scheduling.Doctor;
 import app.clinicreminders.scheduling.DoctorRepository;
 import app.clinicreminders.scheduling.ScheduleRule;
@@ -138,6 +142,71 @@ class DoctorsPageIT extends DashboardTest {
                 .contains("Monday", "9:00 AM – 1:00 PM", "Friday 25 December 2026", "Closed all day")
                 .contains("class=\"back-link\" href=\"/doctors\"")
                 .doesNotContain("/settings/");
+    }
+
+    // --- Deleting ---
+
+    @Test
+    void aDeletedDoctorLeavesTheClinicWithTheirHoursAndLogin() {
+        data.weekly(doctor, DayOfWeek.WEDNESDAY, "09:00", "11:00");
+        data.closedOn(doctor, WEDNESDAY);
+        doctorLoginOf(doctor);
+        Doctor other = data.doctor(clinic, "Dr. Saab", 30);
+        assertThat(get(staff, "/doctors/{id}", doctor.getId())).bodyText()
+                .contains("data-confirm=\"Delete Dr. Khoury? Their hours and login are removed", "Delete doctor");
+
+        assertThat(post(staff, "/doctors/{id}/delete", doctor.getId()))
+                .hasRedirectedUrl("/doctors").flash().containsEntry("notice", "notice.doctor-deleted");
+
+        assertThat(doctors.findByIdAndClinicId(doctor.getId(), clinic.getId()).orElseThrow().isDeleted())
+                .as("kept for the history of past appointments").isTrue();
+        assertThat(get(staff, "/doctors")).bodyText().contains("Dr. Saab").doesNotContain("Dr. Khoury");
+        assertThat(get(staff, "/doctors/{id}", doctor.getId())).hasStatus(404);
+        assertThat(get(staff, "/appointments/new")).bodyText().doesNotContain("Dr. Khoury");
+        assertThat(get(staff, "/week?doctorId={id}", doctor.getId())).bodyText().doesNotContain("Dr. Khoury");
+        assertThat(jdbc.queryForObject("select count(*) from schedule_rule where doctor_id = ?", Integer.class, doctor.getId()))
+                .isZero();
+        assertThat(jdbc.queryForObject("select count(*) from schedule_exception where doctor_id = ?", Integer.class,
+                doctor.getId())).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from staff_user where doctor_id = ?", Integer.class, doctor.getId()))
+                .isZero();
+        assertThat(post(staff, "/doctors/{id}/hours", doctor.getId())
+                .param("day", "MONDAY").param("start", "09:00").param("end", "10:00")).hasStatus(404);
+        assertThat(other.isActive()).isTrue();
+    }
+
+    @Test
+    void aDoctorWithAppointmentsToComeIsNotDeleted() {
+        data.appointment(doctor, data.patient(clinic), Instant.parse("2026-10-21T06:00:00Z"), Duration.ofMinutes(30));
+
+        assertThat(get(staff, "/doctors/{id}", doctor.getId())).bodyText()
+                .contains("Upcoming appointments: 1.", "/week?doctorId=" + doctor.getId())
+                .doesNotContain("/doctors/" + doctor.getId() + "/delete");
+        assertThat(post(staff, "/doctors/{id}/delete", doctor.getId()))
+                .hasRedirectedUrl("/doctors/" + doctor.getId()).flash().containsEntry("error", "error.doctor-has-appointments");
+        assertThat(doctors.findByIdAndClinicId(doctor.getId(), clinic.getId()).orElseThrow().isDeleted()).isFalse();
+    }
+
+    @Test
+    void pastAppointmentsOfADeletedDoctorStayInTheHistory() {
+        Patient rana = data.patient(clinic, "Rana Haddad", "+96170123456", Language.AR);
+        // Wednesday 7 October, last week.
+        data.appointment(doctor, rana, Instant.parse("2026-10-07T06:00:00Z"), Duration.ofMinutes(30));
+
+        post(staff, "/doctors/{id}/delete", doctor.getId()).exchange();
+
+        assertThat(get(staff, "/?date=2026-10-07")).bodyText().contains("Dr. Khoury", "Rana Haddad");
+        assertThat(get(staff, "/")).bodyText().as("not on a day without their appointments").doesNotContain("Dr. Khoury");
+    }
+
+    @Test
+    void onlyTheFrontDeskDeletesAndOnlyTheirClinicsDoctors() {
+        Doctor theirs = data.doctor(data.clinic("B"), "Dr. Elsewhere", 30);
+
+        assertThat(post(doctorLoginOf(doctor), "/doctors/{id}/delete", doctor.getId())).hasStatus(403);
+        assertThat(post(staff, "/doctors/{id}/delete", theirs.getId())).hasStatus(404);
+        assertThat(doctors.findByIdAndClinicId(theirs.getId(), theirs.getClinicId()).orElseThrow().isDeleted()).isFalse();
+        assertThat(doctors.findByIdAndClinicId(doctor.getId(), clinic.getId()).orElseThrow().isDeleted()).isFalse();
     }
 
     @Test

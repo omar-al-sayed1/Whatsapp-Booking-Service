@@ -744,6 +744,14 @@
         document.querySelectorAll("[data-preview-empty]").forEach(empty => (empty.hidden = anyFilled));
     });
 
+    /* A GET filter form with data-clean-query leaves its empty fields out of the address htmx pushes. */
+    document.addEventListener("htmx:configRequest", event => {
+        const formData = event.detail.formData;
+        if (event.detail.verb === "get" && event.detail.elt.matches?.("[data-clean-query]") && formData) {
+            [...formData.keys()].filter(key => formData.get(key) === "").forEach(key => formData.delete(key));
+        }
+    });
+
     /* <input type="date" data-navigate-date="/?date=DATE"> goes to that day when picked. */
     document.addEventListener("change", event => {
         const input = event.target.closest("[data-navigate-date]");

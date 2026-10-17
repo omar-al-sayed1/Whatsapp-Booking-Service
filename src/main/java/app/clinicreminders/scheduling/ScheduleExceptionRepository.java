@@ -20,6 +20,8 @@ public interface ScheduleExceptionRepository extends Repository<ScheduleExceptio
 
     Optional<ScheduleException> findByIdAndClinicId(Long id, Long clinicId);
 
+    List<ScheduleException> findByClinicIdAndDoctorId(Long clinicId, Long doctorId);
+
     ScheduleException save(ScheduleException exception);
 
     void delete(ScheduleException exception);

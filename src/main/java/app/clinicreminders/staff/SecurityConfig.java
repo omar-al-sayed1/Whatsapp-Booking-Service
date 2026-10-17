@@ -45,8 +45,8 @@ class SecurityConfig {
                         // The front desk's: clinic settings, the inbox, adding and editing doctors and their
                         // logins, deleting patients. A doctor may change only their own hours and days off.
                         .requestMatchers("/settings", "/settings/**", "/attention", "/attention/**").hasAnyRole(FRONT_DESK)
-                        .requestMatchers(HttpMethod.POST, "/doctors", "/doctors/*", "/doctors/*/login", "/doctors/*/login/**",
-                                "/patients/*/delete").hasAnyRole(FRONT_DESK)
+                        .requestMatchers(HttpMethod.POST, "/doctors", "/doctors/*", "/doctors/*/delete", "/doctors/*/login",
+                                "/doctors/*/login/**", "/patients/*/delete").hasAnyRole(FRONT_DESK)
                         .anyRequest().hasAnyRole(StaffRole.OWNER.name(), StaffRole.SECRETARY.name(), StaffRole.DOCTOR.name()))
                 .formLogin(form -> form
                         .loginPage("/login")

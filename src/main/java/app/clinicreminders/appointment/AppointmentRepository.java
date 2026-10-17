@@ -58,6 +58,14 @@ public interface AppointmentRepository extends Repository<Appointment, Long> {
             order by a.startsAt""")
     List<Appointment> findUpcomingOf(Long clinicId, Collection<Long> patientIds, Instant after);
 
+    /** How many open (booked or confirmed) appointments the doctor still has to come: deleting them waits for none. */
+    @Query("""
+            select count(a) from Appointment a
+            where a.clinicId = :clinicId and a.doctorId = :doctorId and a.startsAt > :after
+              and a.status in (app.clinicreminders.appointment.AppointmentStatus.BOOKED,
+                               app.clinicreminders.appointment.AppointmentStatus.CONFIRMED)""")
+    long countUpcomingOfDoctor(Long clinicId, Long doctorId, Instant after);
+
     /**
      * Books unless the doctor already has an active appointment starting then. Unlike
      * {@link #saveAndFlush}, losing the race returns empty instead of throwing, so the caller's

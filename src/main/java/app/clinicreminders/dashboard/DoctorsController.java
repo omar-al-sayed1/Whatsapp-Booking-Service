@@ -12,6 +12,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import app.clinicreminders.appointment.AppointmentRepository;
 import app.clinicreminders.common.NotFoundException;
 import app.clinicreminders.dashboard.ClinicContext.Ctx;
 import app.clinicreminders.scheduling.Doctor;
@@ -76,10 +77,11 @@ class DoctorsController {
     private final DoctorRepository doctors;
     private final ScheduleRuleRepository rules;
     private final ScheduleExceptionRepository exceptions;
+    private final AppointmentRepository appointments;
 
     DoctorsController(ClinicContext context, ScheduleSettings scheduleSettings, DoctorSetup doctorSetup,
                       StaffAccounts accounts, DoctorRepository doctors, ScheduleRuleRepository rules,
-                      ScheduleExceptionRepository exceptions) {
+                      ScheduleExceptionRepository exceptions, AppointmentRepository appointments) {
         this.context = context;
         this.scheduleSettings = scheduleSettings;
         this.doctorSetup = doctorSetup;
@@ -87,6 +89,7 @@ class DoctorsController {
         this.doctors = doctors;
         this.rules = rules;
         this.exceptions = exceptions;
+        this.appointments = appointments;
     }
 
     /** For a doctor's login, their own page. */
@@ -97,6 +100,7 @@ class DoctorsController {
             return "redirect:/doctors/" + ctx.doctorId();
         }
         model.addAttribute("doctors", doctors.findByClinicIdOrderByDisplayName(ctx.clinicId()).stream()
+                .filter(doctor -> !doctor.isDeleted())
                 .map(doctor -> new DoctorRow(doctor, rules.findByClinicIdAndDoctorId(ctx.clinicId(), doctor.getId()).stream()
                         .map(ScheduleRule::getDayOfWeek)
                         .collect(Collectors.toCollection(() -> EnumSet.noneOf(DayOfWeek.class)))))
@@ -171,8 +175,23 @@ class DoctorsController {
         if (!ctx.isDoctor()) {
             model.addAttribute("login", accounts.doctorLogin(ctx.clinicId(), id).orElse(null));
             model.addAttribute("minPassword", StaffAccounts.MIN_PASSWORD_LENGTH);
+            model.addAttribute("upcoming", appointments.countUpcomingOfDoctor(ctx.clinicId(), id, ctx.now()));
         }
         return "dashboard/doctor-settings";
+    }
+
+    /** Front desk, after a confirmation; refused while the doctor still has appointments to come. */
+    @PostMapping("/doctors/{id}/delete")
+    String delete(@PathVariable long id, @AuthenticationPrincipal StaffPrincipal staff, HttpServletRequest request,
+                  RedirectAttributes redirect) {
+        Ctx ctx = context.of(staff, request);
+        doctor(ctx, id);
+        if (!doctorSetup.delete(ctx.clinicId(), id, ctx.now())) {
+            redirect.addFlashAttribute("error", "error.doctor-has-appointments");
+            return "redirect:/doctors/" + id;
+        }
+        redirect.addFlashAttribute("notice", "notice.doctor-deleted");
+        return "redirect:/doctors";
     }
 
     /** A login for a doctor who has none, with the username and password typed by the owner or secretary. */
@@ -299,10 +318,12 @@ class DoctorsController {
         return "redirect:/doctors/" + id;
     }
 
-    /** The clinic's doctor, if this user may see them (a doctor's login: only themself). */
+    /** The clinic's doctor, if this user may see them (a doctor's login: only themself); a deleted one is not found. */
     private Doctor doctor(Ctx ctx, long id) {
         ctx.requireSees(id, "Doctor", id);
-        return doctors.findByIdAndClinicId(id, ctx.clinicId()).orElseThrow(() -> new NotFoundException("Doctor", id));
+        return doctors.findByIdAndClinicId(id, ctx.clinicId())
+                .filter(doctor -> !doctor.isDeleted())
+                .orElseThrow(() -> new NotFoundException("Doctor", id));
     }
 
     /** What's wrong with a login typed for a doctor (before asking whether the username is free), or null. */

@@ -1,6 +1,7 @@
 package app.clinicreminders.scheduling;
 
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalDate;
 
 import app.clinicreminders.clinic.Clinic;
@@ -47,6 +48,18 @@ public class ScheduleSettings {
         doctors.findByClinicIdOrderByDisplayName(clinicId).forEach(doctor -> doctor.changeSlotMinutes(minutes));
     }
 
+    /**
+     * Takes the doctor out of the clinic: their hours and days off go, and they are left out of
+     * lists and booking. The doctor itself stays for the history of their past appointments; the
+     * caller makes sure none are still to come.
+     */
+    public void deleteDoctor(long clinicId, long doctorId, Instant now) {
+        Doctor doctor = doctor(clinicId, doctorId);
+        rules.findByClinicIdAndDoctorId(clinicId, doctorId).forEach(rules::delete);
+        exceptions.findByClinicIdAndDoctorId(clinicId, doctorId).forEach(exceptions::delete);
+        doctor.delete(now);
+    }
+
     public void updateDoctor(long clinicId, long doctorId, String displayName, boolean active) {
         Doctor doctor = doctor(clinicId, doctorId);
         doctor.rename(requireName(displayName));
@@ -89,8 +102,11 @@ public class ScheduleSettings {
                 .orElseThrow(() -> new NotFoundException("Day", exceptionId)));
     }
 
+    /** The clinic's doctor; a deleted one is not found. */
     private Doctor doctor(long clinicId, long doctorId) {
-        return doctors.findByIdAndClinicId(doctorId, clinicId).orElseThrow(() -> new NotFoundException("Doctor", doctorId));
+        return doctors.findByIdAndClinicId(doctorId, clinicId)
+                .filter(doctor -> !doctor.isDeleted())
+                .orElseThrow(() -> new NotFoundException("Doctor", doctorId));
     }
 
     private static String requireName(String name) {

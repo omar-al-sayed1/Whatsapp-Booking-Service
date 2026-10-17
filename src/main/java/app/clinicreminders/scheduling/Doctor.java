@@ -30,6 +30,10 @@ public class Doctor {
 
     private boolean active = true;
 
+    /** Set when the clinic deleted the doctor: gone from the dashboard and booking, kept for past appointments. */
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     @Generated
     @Column(name = "created_at")
     private Instant createdAt;
@@ -83,6 +87,16 @@ public class Doctor {
 
     public boolean isActive() {
         return active;
+    }
+
+    /** Takes the doctor out of the clinic: no longer active, and left out wherever doctors are listed. */
+    public void delete(Instant now) {
+        this.active = false;
+        this.deletedAt = now;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
     }
 
     public Instant getCreatedAt() {

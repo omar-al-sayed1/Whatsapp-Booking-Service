@@ -77,6 +77,11 @@ public class StaffAccounts {
         doctorUser(clinicId, doctorId).changePasswordHash(passwordEncoder.encode(password));
     }
 
+    /** When the doctor is deleted: their login goes with them (a login has no history to keep). */
+    public void deleteDoctorLogin(long clinicId, long doctorId) {
+        users.findByClinicIdAndDoctorId(clinicId, doctorId).ifPresent(users::delete);
+    }
+
     /** As {@link #setEnabled}, for a doctor's login. */
     public void setDoctorLoginEnabled(long clinicId, long doctorId, boolean enabled) {
         doctorUser(clinicId, doctorId).setEnabled(enabled);

@@ -61,6 +61,9 @@
             <span class="nav-label" th:text="#{operator.title}">Operator</span>
             <a th:href="@{/operator}" th:classappend="${active == 'operator'} ? 'active'" th:attr="aria-current=${active == 'operator'} ? 'page'">
                 <svg class="icon" aria-hidden="true"><use href="#i-building"/></svg><span th:text="#{nav.clinics}">Clinics</span></a>
+            <a th:href="@{/operator/patients}" th:classappend="${active == 'operator-patients'} ? 'active'"
+               th:attr="aria-current=${active == 'operator-patients'} ? 'page'">
+                <svg class="icon" aria-hidden="true"><use href="#i-users"/></svg><span th:text="#{operator.patients.title}">Patients</span></a>
         </nav>
 
         <!--/* The account menu, and beside it (clinic staff) the bell for Needs attention with its count. */-->

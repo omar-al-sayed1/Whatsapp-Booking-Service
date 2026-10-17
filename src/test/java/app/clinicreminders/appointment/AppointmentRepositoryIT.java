@@ -154,4 +154,16 @@ class AppointmentRepositoryIT extends IntegrationTest {
                 .extracting(Appointment::getId).containsExactly(theirs.getId());
         assertThat(appointments.findUpcomingOf(data.clinic("B").getId(), List.of(patient.getId()), FROM)).isEmpty();
     }
+
+    @Test
+    void countUpcomingOfDoctorCountsTheirOpenFutureAppointmentsInThisClinic() {
+        data.appointment(doctor, patient, FROM.plus(Duration.ofDays(1)), HALF_HOUR);
+        data.appointment(doctor, patient, FROM.plus(Duration.ofDays(2)), HALF_HOUR);
+        data.appointment(doctor, patient, FROM.minus(Duration.ofDays(1)), HALF_HOUR);
+        data.cancelledAppointment(doctor, patient, FROM.plus(Duration.ofDays(3)), HALF_HOUR);
+        data.appointment(data.doctor(clinic, 30), patient, FROM.plus(Duration.ofDays(1)), HALF_HOUR);
+
+        assertThat(appointments.countUpcomingOfDoctor(clinic.getId(), doctor.getId(), FROM)).isEqualTo(2);
+        assertThat(appointments.countUpcomingOfDoctor(data.clinic("B").getId(), doctor.getId(), FROM)).isZero();
+    }
 }

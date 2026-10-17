@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'operator-patients', ~{::main})}">
+<head><title th:text="#{operator.patients.title}">Patients</title></head>
+<body>
+<main class="container">
+    <header class="page-head">
+        <div>
+            <div class="eyebrow"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg><span th:text="#{operator.title}">Operator</span></div>
+            <h1 th:text="#{operator.patients.title}">Patients</h1>
+            <p class="muted" th:text="#{operator.patients.intro}">Every clinic's patients. Search, filter and sort to find anyone quickly.</p>
+        </div>
+    </header>
+
+    <!--/*
+      The filters are a plain GET form, so the list's address says what is shown (bookmark it, share
+      it). With htmx the results update as you type or pick; without it, Enter applies.
+    */-->
+    <form method="get" th:action="@{/operator/patients}" class="card filter-panel" role="search"
+          th:hx-get="@{/operator/patients}" hx-trigger="input delay:250ms, search" hx-target="#op-results"
+          hx-select="#op-results" hx-swap="outerHTML" hx-push-url="true" hx-indicator=".filter-search" data-clean-query>
+        <div class="big-search filter-search">
+            <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+            <input type="search" name="q" th:value="${q}" th:placeholder="#{operator.patients.search}"
+                   th:aria-label="#{operator.patients.search}" autocomplete="off" dir="auto" data-key="slash">
+            <span class="htmx-indicator" aria-hidden="true"></span>
+            <kbd class="kbd-hint">/</kbd>
+        </div>
+        <div class="filter-grid">
+            <label><span th:text="#{operator.patients.clinic}">Clinic</span>
+                <select name="clinic">
+                    <option value="" th:text="#{operator.patients.clinic.all}">All clinics</option>
+                    <option th:each="c : ${clinics}" th:value="${c.id}" th:text="${c.name}"
+                            th:selected="${current.clinic == c.id + ''}">Dr. Demo</option>
+                </select></label>
+            <label><span th:text="#{operator.patients.language}">Language</span>
+                <select name="language">
+                    <option value="" th:text="#{operator.patients.any}">Any</option>
+                    <option value="ar" th:selected="${current.language == 'ar'}" th:text="#{language.ar}">Arabic</option>
+                    <option value="en" th:selected="${current.language == 'en'}" th:text="#{language.en}">English</option>
+                </select></label>
+            <label><span th:text="#{operator.patients.booking}">Booking</span>
+                <select name="booking">
+                    <option value="" th:text="#{operator.patients.any}">Any</option>
+                    <option value="upcoming" th:selected="${current.booking == 'upcoming'}" th:text="#{operator.patients.booking.upcoming}">Has an upcoming appointment</option>
+                    <option value="none" th:selected="${current.booking == 'none'}" th:text="#{operator.patients.booking.none}">No upcoming appointment</option>
+                </select></label>
+            <label><span th:text="#{operator.patients.last}">Last appointment</span>
+                <select name="last">
+                    <option value="" th:text="#{operator.patients.any-time}">Any time</option>
+                    <option value="last-30-days" th:selected="${current.last == 'last-30-days'}" th:text="#{operator.patients.last.last-30-days}">In the last 30 days</option>
+                    <option value="last-90-days" th:selected="${current.last == 'last-90-days'}" th:text="#{operator.patients.last.last-90-days}">In the last 90 days</option>
+                    <option value="over-6-months" th:selected="${current.last == 'over-6-months'}" th:text="#{operator.patients.last.over-6-months}">Over 6 months ago</option>
+                    <option value="never" th:selected="${current.last == 'never'}" th:text="#{operator.patients.last.never}">Never</option>
+                </select></label>
+            <label><span th:text="#{operator.patients.messages}">Messages</span>
+                <select name="messages">
+                    <option value="" th:text="#{operator.patients.anyone}">Anyone</option>
+                    <option value="reachable" th:selected="${current.messages == 'reachable'}" th:text="#{operator.patients.messages.reachable}">Can be messaged</option>
+                    <option value="opted-out" th:selected="${current.messages == 'opted-out'}" th:text="#{operator.patients.messages.opted-out}">Opted out</option>
+                </select></label>
+            <label><span th:text="#{operator.patients.sort}">Sort by</span>
+                <select name="sort">
+                    <option value="" th:text="#{operator.patients.sort.name}">Name</option>
+                    <option value="newest" th:selected="${current.sort == 'newest'}" th:text="#{operator.patients.sort.newest}">Newest first</option>
+                    <option value="last-appointment" th:selected="${current.sort == 'last-appointment'}" th:text="#{operator.patients.sort.last-appointment}">Last appointment</option>
+                    <option value="next-appointment" th:selected="${current.sort == 'next-appointment'}" th:text="#{operator.patients.sort.next-appointment}">Next appointment</option>
+                </select></label>
+        </div>
+        <noscript><button type="submit" class="primary" th:text="#{operator.patients.apply}">Apply</button></noscript>
+    </form>
+
+    <section id="op-results" aria-live="polite">
+        <div class="results-bar">
+            <p class="results-note" th:text="#{operator.patients.count(${total + ''})}">48 patients</p>
+            <div class="filter-chips" th:unless="${chips.isEmpty()}">
+                <a class="filter-chip" th:each="c : ${chips}" th:href="${c.removeUrl()}"
+                   th:title="#{operator.patients.remove-filter}" th:aria-label="#{operator.patients.remove-filter} + ': ' + ${c.label()}">
+                    <span th:text="${c.label()}">Arabic</span><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></a>
+                <a class="clear-filters" th:href="@{/operator/patients}" th:text="#{operator.patients.clear}">Clear all</a>
+            </div>
+        </div>
+
+        <div class="card empty" th:if="${rows.isEmpty()}">
+            <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg></span>
+            <strong th:text="#{operator.patients.empty}">No patient matches.</strong>
+            <p th:text="#{operator.patients.empty.hint}">Try fewer filters, or search by part of the phone number.</p>
+            <a class="button sm" th:unless="${chips.isEmpty()}" th:href="@{/operator/patients}" th:text="#{operator.patients.clear}">Clear all</a>
+        </div>
+
+        <!--/* A table on computers; on phones each row becomes a card (CSS, using the data-label of each cell). */-->
+        <div class="card table-card" th:unless="${rows.isEmpty()}">
+            <table class="data-table">
+                <thead>
+                <tr>
+                    <th th:text="#{operator.patients.col.patient}">Patient</th>
+                    <th th:text="#{operator.patients.clinic}">Clinic</th>
+                    <th th:text="#{operator.patients.col.next}">Next appointment</th>
+                    <th th:text="#{operator.patients.col.last}">Last appointment</th>
+                    <th class="num" th:text="#{operator.patients.col.appointments}">Appointments</th>
+                    <th th:text="#{operator.patients.col.added}">Added</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="r : ${rows}">
+                    <td class="cell-patient">
+                        <span class="avatar sm" th:style="'--hue:' + ${@avatars.hue(r.name())}" th:text="${@avatars.initials(r.name())}">RH</span>
+                        <span class="patient-cell">
+                            <strong th:text="${r.name()}">Rana Haddad</strong>
+                            <span class="patient-cell-meta">
+                                <span dir="ltr" th:text="${r.phone()}">+96170123456</span>
+                                <span class="tag" th:text="#{'language.' + ${r.language()}}">Arabic</span>
+                                <span class="chip chip-CANCELLED" th:if="${r.optedOut()}" th:text="#{operator.patients.messages.opted-out}">Opted out</span>
+                            </span>
+                        </span>
+                    </td>
+                    <td th:attr="data-label=#{operator.patients.clinic}">
+                        <a th:href="@{/operator/clinics/{id}(id=${r.clinicId()})}" th:text="${r.clinic()}">Dr. Demo</a></td>
+                    <td th:attr="data-label=#{operator.patients.col.next}">
+                        <span class="pill-upcoming" th:if="${r.next()}" th:text="${r.next()}">Wed 21 Oct 10:30 AM</span>
+                        <span class="muted" th:unless="${r.next()}">–</span></td>
+                    <td th:attr="data-label=#{operator.patients.col.last}">
+                        <span th:text="${r.last()} ?: '–'" th:classappend="${r.last() == null} ? 'muted'">Tue 3 Nov</span></td>
+                    <td class="num" th:attr="data-label=#{operator.patients.col.appointments}" th:text="${r.appointments()}">4</td>
+                    <td class="muted" th:attr="data-label=#{operator.patients.col.added}" th:text="${r.added()}">Mon 2 Feb</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <nav class="pager" th:if="${pages > 1}" th:aria-label="#{operator.patients.pages}">
+            <a class="button sm" th:if="${previousUrl}" th:href="${previousUrl}">
+                <svg class="icon flip-rtl" aria-hidden="true"><use href="#i-chevron-left"/></svg><span th:text="#{operator.patients.previous}">Previous</span></a>
+            <span class="pager-info" th:text="#{operator.patients.page(${page + ''}, ${pages + ''})}">Page 1 of 4</span>
+            <a class="button sm" th:if="${nextUrl}" th:href="${nextUrl}">
+                <span th:text="#{operator.patients.next}">Next</span><svg class="icon flip-rtl" aria-hidden="true"><use href="#i-chevron-right"/></svg></a>
+        </nav>
+    </section>
+</main>
+</body>
+</html>
