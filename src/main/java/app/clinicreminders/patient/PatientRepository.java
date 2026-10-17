@@ -27,6 +27,23 @@ public interface PatientRepository extends Repository<Patient, Long> {
             limit 50""")
     List<Patient> search(Long clinicId, String name, String digits);
 
+    /**
+     * Patients with at least one appointment, matched like {@link #search}, most recently booked first:
+     * the patient picker of the booking form. At most 8.
+     */
+    @Query("""
+            select new app.clinicreminders.patient.BookedPatient(p.id, p.name, p.phoneE164, p.language, p.optedOut,
+                                                                 max(a.startsAt))
+            from Patient p
+            join Appointment a on a.patientId = p.id and a.clinicId = p.clinicId
+            where p.clinicId = :clinicId
+              and (lower(p.name) like lower(concat('%', :name, '%'))
+                   or (:digits <> '' and p.phoneE164 like concat('%', :digits, '%')))
+            group by p.id, p.name, p.phoneE164, p.language, p.optedOut
+            order by max(a.startsAt) desc, p.id
+            limit 8""")
+    List<BookedPatient> searchBooked(Long clinicId, String name, String digits);
+
     Patient save(Patient patient);
 
     void delete(Patient patient);

@@ -3,35 +3,53 @@ package app.clinicreminders.scheduling;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 
+import app.clinicreminders.clinic.Clinic;
+import app.clinicreminders.clinic.ClinicRepository;
 import app.clinicreminders.common.NotFoundException;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Doctors, weekly hours and closed days, as edited on the settings pages. Always within one clinic. */
+/**
+ * Doctors, weekly hours and closed days, as edited on the settings pages, and the clinic's
+ * appointment length, set by the operator. Always within one clinic.
+ */
 @Service
 @Transactional
 public class ScheduleSettings {
 
+    private final ClinicRepository clinics;
     private final DoctorRepository doctors;
     private final ScheduleRuleRepository rules;
     private final ScheduleExceptionRepository exceptions;
 
-    ScheduleSettings(DoctorRepository doctors, ScheduleRuleRepository rules, ScheduleExceptionRepository exceptions) {
+    ScheduleSettings(ClinicRepository clinics, DoctorRepository doctors, ScheduleRuleRepository rules,
+                     ScheduleExceptionRepository exceptions) {
+        this.clinics = clinics;
         this.doctors = doctors;
         this.rules = rules;
         this.exceptions = exceptions;
     }
 
-    public Doctor addDoctor(long clinicId, String displayName, int slotMinutes) {
-        return doctors.save(new Doctor(clinicId, requireName(displayName), requireSlotMinutes(slotMinutes)));
+    /** A new doctor takes the clinic's appointment length. */
+    public Doctor addDoctor(long clinicId, String displayName) {
+        return doctors.save(new Doctor(clinicId, requireName(displayName), clinic(clinicId).getSlotMinutes()));
     }
 
-    /** Existing appointments keep their times; the new slot length applies to new bookings. */
-    public void updateDoctor(long clinicId, long doctorId, String displayName, int slotMinutes, boolean active) {
+    /**
+     * The operator's appointment length for the clinic, applied to all its doctors. Existing
+     * appointments keep their times; new slots use the new length.
+     *
+     * @throws IllegalArgumentException outside 5 to 240 minutes; nothing is changed
+     */
+    public void changeSlotLength(long clinicId, int minutes) {
+        clinic(clinicId).changeSlotMinutes(minutes);
+        doctors.findByClinicIdOrderByDisplayName(clinicId).forEach(doctor -> doctor.changeSlotMinutes(minutes));
+    }
+
+    public void updateDoctor(long clinicId, long doctorId, String displayName, boolean active) {
         Doctor doctor = doctor(clinicId, doctorId);
         doctor.rename(requireName(displayName));
-        doctor.changeSlotMinutes(requireSlotMinutes(slotMinutes));
         if (active) {
             doctor.activate();
         } else {
@@ -77,10 +95,7 @@ public class ScheduleSettings {
         return name.strip();
     }
 
-    private static int requireSlotMinutes(int minutes) {
-        if (minutes < 5 || minutes > 240) {
-            throw new IllegalArgumentException("Slot length must be 5-240 minutes");
-        }
-        return minutes;
+    private Clinic clinic(long clinicId) {
+        return clinics.findById(clinicId).orElseThrow(() -> new NotFoundException("Clinic", clinicId));
     }
 }

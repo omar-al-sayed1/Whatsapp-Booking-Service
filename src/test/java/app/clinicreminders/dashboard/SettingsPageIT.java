@@ -81,27 +81,30 @@ class SettingsPageIT extends DashboardTest {
     }
 
     @Test
-    void addsAndEditsDoctors() {
-        assertThat(post(staff, "/settings/doctors").param("displayName", "Dr. Saab").param("slotMinutes", "20"))
-                .hasStatus3xxRedirection();
+    void addsAndEditsDoctorsWhoTakeTheClinicsAppointmentLength() {
+        clinic.changeSlotMinutes(25);
+        clinics.save(clinic);
+        assertThat(post(staff, "/settings/doctors").param("displayName", "Dr. Saab")).hasStatus3xxRedirection();
         Doctor saab = doctors.findByClinicIdOrderByDisplayName(clinic.getId()).stream()
                 .filter(d -> d.getDisplayName().equals("Dr. Saab")).findFirst().orElseThrow();
-        assertThat(saab.getSlotMinutes()).isEqualTo(20);
+        assertThat(saab.getSlotMinutes()).isEqualTo(25);
 
-        post(staff, "/settings/doctors/{id}", saab.getId()).param("displayName", "Dr. Saab Jr").param("slotMinutes", "15")
-                .exchange();
+        post(staff, "/settings/doctors/{id}", saab.getId()).param("displayName", "Dr. Saab Jr")
+                .param("slotMinutes", "15").exchange();
 
         Doctor edited = doctors.findByIdAndClinicId(saab.getId(), clinic.getId()).orElseThrow();
         assertThat(edited.getDisplayName()).isEqualTo("Dr. Saab Jr");
-        assertThat(edited.getSlotMinutes()).isEqualTo(15);
+        assertThat(edited.getSlotMinutes()).as("only the operator sets the length").isEqualTo(25);
         assertThat(edited.isActive()).isFalse();
+        assertThat(get(staff, "/settings/doctors/{id}", saab.getId())).bodyText()
+                .contains("Appointments are 25 minutes long.").doesNotContain("name=\"slotMinutes\"");
     }
 
     @Test
-    void refusesADoctorWithoutANameOrWithAnOddSlotLength() {
-        assertThat(post(staff, "/settings/doctors").param("displayName", " ").param("slotMinutes", "30"))
+    void refusesADoctorWithoutAName() {
+        assertThat(post(staff, "/settings/doctors").param("displayName", " "))
                 .flash().containsEntry("error", "error.doctor");
-        assertThat(post(staff, "/settings/doctors/{id}", doctor.getId()).param("displayName", "Dr. K").param("slotMinutes", "3"))
+        assertThat(post(staff, "/settings/doctors/{id}", doctor.getId()).param("displayName", " "))
                 .flash().containsEntry("error", "error.doctor");
     }
 
@@ -146,6 +149,26 @@ class SettingsPageIT extends DashboardTest {
     }
 
     @Test
+    void openingHoursAreDrawnOnASixToTenBar() {
+        data.weekly(doctor, DayOfWeek.MONDAY, "09:00", "13:00");
+        data.weekly(doctor, DayOfWeek.TUESDAY, "05:00", "23:30");
+
+        assertThat(get(staff, "/settings/doctors/{id}", doctor.getId())).bodyText()
+                .as("9 to 13: 3 h after 6:00 for 4 h of 16").contains("inset-inline-start:18.75%;width:25.00%")
+                .as("clamped to the bar").contains("inset-inline-start:0.00%;width:100.00%");
+    }
+
+    @Test
+    void theDoctorsTabListsDoctorsWithTheirWorkingDays() {
+        data.weekly(doctor, DayOfWeek.MONDAY, "09:00", "13:00");
+
+        assertThat(get(staff, "/settings?tab=doctors")).hasStatusOk().bodyText()
+                .contains("Dr. Khoury", "class=\"on\"", "/settings/doctors/" + doctor.getId())
+                .doesNotContain("name=\"h24Enabled\"");
+        assertThat(get(staff, "/settings")).bodyText().contains("name=\"h24Enabled\"");
+    }
+
+    @Test
     void theDoctorPageListsHoursAndDaysOff() {
         data.weekly(doctor, DayOfWeek.MONDAY, "09:00", "13:00");
         data.closedOn(doctor, LocalDate.of(2026, 12, 25));
@@ -162,7 +185,7 @@ class SettingsPageIT extends DashboardTest {
         Long theirDay = data.closedOn(theirs, WEDNESDAY).getId();
 
         assertThat(get(staff, "/settings/doctors/{id}", theirs.getId())).hasStatus(404);
-        assertThat(post(staff, "/settings/doctors/{id}", theirs.getId()).param("displayName", "Hacked").param("slotMinutes", "30"))
+        assertThat(post(staff, "/settings/doctors/{id}", theirs.getId()).param("displayName", "Hacked"))
                 .hasStatus(404);
         assertThat(post(staff, "/settings/doctors/{id}/hours", theirs.getId())
                 .param("day", "MONDAY").param("start", "09:00").param("end", "10:00")).hasStatus(404);

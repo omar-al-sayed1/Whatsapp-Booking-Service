@@ -2,61 +2,123 @@
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'settings', ~{::main})}">
 <head><title th:text="#{settings.title}">Settings</title></head>
 <body>
-<main class="container narrow">
-    <h1 th:text="#{settings.title}">Settings</h1>
+<main class="container">
+    <header class="page-head">
+        <div>
+            <div class="eyebrow"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg><span th:text="#{settings.title}">Settings</span></div>
+            <h1 th:text="#{settings.title}">Settings</h1>
+        </div>
+    </header>
 
-    <section class="card">
-        <h2 th:text="#{settings.clinic}">Clinic</h2>
-        <form method="post" th:action="@{/settings/clinic}" class="stack">
-            <label>
-                <span th:text="#{settings.default-language}">New patients' language</span>
-                <select name="defaultLanguage">
-                    <option value="ar" th:selected="${defaultLanguage == 'ar'}" th:text="#{language.ar}">Arabic</option>
-                    <option value="en" th:selected="${defaultLanguage == 'en'}" th:text="#{language.en}">English</option>
-                </select>
-            </label>
-            <label class="check">
-                <input type="checkbox" name="h24Enabled" value="true" th:checked="${h24Enabled}">
-                <span th:text="#{settings.h24}">Send a reminder the day before</span>
-            </label>
-            <label class="check">
-                <input type="checkbox" name="h2Enabled" value="true" th:checked="${h2Enabled}">
-                <span th:text="#{settings.h2}">Send a reminder 2 hours before</span>
-            </label>
-            <label>
-                <span th:text="#{settings.address}">Address</span>
-                <textarea name="address" rows="2" th:maxlength="${contactMax}" th:text="${address}"></textarea>
-            </label>
-            <label>
-                <span th:text="#{settings.hours-text}">Opening hours</span>
-                <textarea name="hoursText" rows="2" th:maxlength="${contactMax}" th:text="${hoursText}"></textarea>
-            </label>
-            <p class="muted" th:text="#{settings.contact.hint}">Sent to patients who tap Info on WhatsApp.</p>
-            <div class="buttons"><button type="submit" class="primary" th:text="#{action.save}">Save</button></div>
-        </form>
-    </section>
+    <nav class="tabs" th:aria-label="#{settings.title}">
+        <a th:href="@{/settings}" th:classappend="${tab == 'clinic'} ? 'active'" th:attr="aria-current=${tab == 'clinic'} ? 'page'"
+           th:text="#{settings.clinic}">Clinic</a>
+        <a th:href="@{/settings(tab='doctors')}" th:classappend="${tab == 'doctors'} ? 'active'"
+           th:attr="aria-current=${tab == 'doctors'} ? 'page'">
+            <span th:text="#{settings.doctors}">Doctors</span> <span th:text="'(' + ${doctors.size()} + ')'">(2)</span></a>
+    </nav>
 
-    <section class="card">
-        <h2 th:text="#{settings.doctors}">Doctors</h2>
-        <table class="list" th:unless="${doctors.isEmpty()}">
-            <tbody>
-            <tr th:each="d : ${doctors}">
-                <td><strong th:text="${d.displayName}">Dr. Khoury</strong></td>
-                <td class="muted" th:text="#{settings.doctor.minutes(${d.slotMinutes})}">30 min</td>
-                <td class="muted" th:text="${d.active} ? #{settings.doctor.active} : #{settings.doctor.inactive}">Taking appointments</td>
-                <td class="actions"><a class="button" th:href="@{/settings/doctors/{id}(id=${d.id})}"
-                                       th:text="#{settings.doctor.hours-link}">Hours and days off</a></td>
-            </tr>
-            </tbody>
-        </table>
-        <h3 th:text="#{settings.doctor.add}">Add a doctor</h3>
-        <form method="post" th:action="@{/settings/doctors}" class="row">
-            <label><span th:text="#{settings.doctor.name}">Name</span><input type="text" name="displayName" required></label>
-            <label><span th:text="#{settings.doctor.slot}">Slot length</span>
-                <input type="number" name="slotMinutes" value="30" min="5" max="240" step="5" required></label>
-            <button type="submit" th:text="#{action.add}">Add</button>
-        </form>
-    </section>
+    <!--/* One form for the clinic: every field is posted together, so nothing is switched off by accident. */-->
+    <form method="post" th:action="@{/settings/clinic}" th:if="${tab == 'clinic'}">
+        <div class="grid-2">
+            <div class="stack">
+                <section class="card">
+                    <div class="section-head"><h2 th:text="#{settings.section.reminders}">Reminders</h2></div>
+                    <label class="setting">
+                        <span><strong th:text="#{settings.h24}">Send a reminder the day before</strong>
+                            <span class="hint" th:text="#{settings.h24.hint}">Skipped when booked less than a day ahead.</span></span>
+                        <input type="checkbox" class="switch" name="h24Enabled" value="true" th:checked="${h24Enabled}">
+                    </label>
+                    <label class="setting">
+                        <span><strong th:text="#{settings.h2}">Send a reminder 2 hours before</strong>
+                            <span class="hint" th:text="#{settings.h2.hint}">Skipped during quiet hours.</span></span>
+                        <input type="checkbox" class="switch" name="h2Enabled" value="true" th:checked="${h2Enabled}">
+                    </label>
+                </section>
+                <section class="card">
+                    <div class="section-head"><h2 th:text="#{settings.default-language}">New patients' language</h2></div>
+                    <p class="hint" th:text="#{settings.default-language.hint}">The language new patients get until they choose.</p>
+                    <div class="radio-pills" role="radiogroup" th:aria-label="#{settings.default-language}">
+                        <label><input type="radio" name="defaultLanguage" value="ar" th:checked="${defaultLanguage == 'ar'}">
+                            <span th:text="#{language.ar}">Arabic</span></label>
+                        <label><input type="radio" name="defaultLanguage" value="en" th:checked="${defaultLanguage == 'en'}">
+                            <span th:text="#{language.en}">English</span></label>
+                    </div>
+                </section>
+            </div>
+
+            <section class="card">
+                <div class="section-head"><h2 th:text="#{settings.section.info}">Info on WhatsApp</h2></div>
+                <p class="hint" th:text="#{settings.contact.hint}">Sent to patients who tap Info on WhatsApp.</p>
+                <div class="stack">
+                    <label>
+                        <span th:text="#{settings.address}">Address</span>
+                        <textarea name="address" rows="2" th:maxlength="${contactMax}" th:text="${address}" data-preview="address"></textarea>
+                    </label>
+                    <label>
+                        <span th:text="#{settings.hours-text}">Opening hours</span>
+                        <textarea name="hoursText" rows="2" th:maxlength="${contactMax}" th:text="${hoursText}" data-preview="hours"></textarea>
+                    </label>
+                </div>
+                <div class="preview-label" th:text="#{settings.preview}">Preview on WhatsApp</div>
+                <div class="preview" aria-hidden="true">
+                    <div class="bubble in">
+                        <div th:hidden="${#strings.isEmpty(address)}" data-preview-line="address">
+                            <span th:text="#{settings.preview.address}">Address:</span> <span data-preview-for="address" th:text="${address}">Main street</span></div>
+                        <div th:hidden="${#strings.isEmpty(hoursText)}" data-preview-line="hours">
+                            <span th:text="#{settings.preview.hours}">Opening hours:</span> <span data-preview-for="hours" th:text="${hoursText}">9 to 1</span></div>
+                        <div th:hidden="${!#strings.isEmpty(address) or !#strings.isEmpty(hoursText)}" data-preview-empty
+                             th:text="#{booking.info.none}">Please call us for our address and opening hours.</div>
+                        <time>10:00</time>
+                    </div>
+                </div>
+            </section>
+        </div>
+        <div class="form-actions spaced">
+            <button type="submit" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>
+                <span th:text="#{action.save}">Save</span></button>
+        </div>
+    </form>
+
+    <div class="grid-2" th:if="${tab == 'doctors'}">
+        <section class="card">
+            <div class="section-head"><h2 th:text="#{settings.doctors}">Doctors</h2><span class="count" th:text="${doctors.size()}">2</span></div>
+            <p class="muted" th:if="${doctors.isEmpty()}" th:text="#{today.no-doctors}">No doctors yet.</p>
+            <ul class="doctor-cards">
+                <li th:each="r : ${doctors}">
+                    <a class="doctor-card" th:classappend="${!r.doctor().active} ? 'inactive'"
+                       th:href="@{/settings/doctors/{id}(id=${r.doctor().id})}">
+                        <span class="avatar lg" th:style="'--hue:' + ${@avatars.hue(r.doctor().displayName)}"
+                              th:text="${@avatars.initials(r.doctor().displayName)}">DK</span>
+                        <span class="grow">
+                            <strong th:text="${r.doctor().displayName}">Dr. Khoury</strong>
+                            <span class="tags">
+                                <span class="tag"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
+                                    <span th:text="#{settings.doctor.minutes(${r.doctor().slotMinutes + ''})}">30 min</span></span>
+                                <span class="tag" th:text="${r.doctor().active} ? #{settings.doctor.active} : #{settings.doctor.inactive}">Taking appointments</span>
+                            </span>
+                        </span>
+                        <span class="mini-week" th:aria-label="#{settings.hours}">
+                            <span th:each="w : ${weekdays}" th:classappend="${r.workingDays().contains(w.day())} ? 'on'" th:text="${w.letter()}">M</span>
+                        </span>
+                        <svg class="icon chevron flip-rtl" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+                    </a>
+                </li>
+            </ul>
+        </section>
+        <section class="card">
+            <div class="section-head"><h2 th:text="#{settings.doctor.add}">Add a doctor</h2></div>
+            <form method="post" th:action="@{/settings/doctors}" class="stack">
+                <label><span th:text="#{settings.doctor.name}">Name</span><input type="text" name="displayName" required></label>
+                <p class="hint"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
+                    <span th:text="#{settings.slot-length.set-by-operator(${slotMinutes + ''})}">Appointments are 20 minutes long.</span></p>
+                <div class="form-actions">
+                    <button type="submit" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                        <span th:text="#{action.add}">Add</span></button>
+                </div>
+            </form>
+        </section>
+    </div>
 </main>
 </body>
 </html>

@@ -13,9 +13,13 @@ import app.clinicreminders.staff.StaffUserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 class SecurityIT extends DashboardTest {
+
+    /** What Chrome sends when it opens a page. */
+    private static final String BROWSER_PAGE = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
 
     @Autowired
     StaffUserRepository users;
@@ -42,6 +46,38 @@ class SecurityIT extends DashboardTest {
         assertThat(mvc.get().uri("/today/list?date=2026-10-14").header("HX-Request", "true"))
                 .hasStatus(401)
                 .headers().hasValue("HX-Redirect", "/login");
+    }
+
+    @Test
+    void anExpiredRefreshIsNotWhereLoggingInLands() {
+        MockHttpSession session = new MockHttpSession();
+        mvc.get().uri("/today/list?date=2026-10-14").header("HX-Request", "true").session(session).exchange();
+
+        assertThat(mvc.post().uri("/login").session(session).param("username", "rana.sec").param("password", "s3cret-pass")
+                .with(csrf())).headers().hasValue("Location", "/");
+    }
+
+    @Test
+    void aPageAskedForBeforeLoggingInOpensAfterwards() {
+        MockHttpSession session = new MockHttpSession();
+        mvc.get().uri("/week").header("Accept", BROWSER_PAGE).session(session).exchange();
+
+        String location = mvc.post().uri("/login").session(session).param("username", "rana.sec")
+                .param("password", "s3cret-pass").with(csrf()).exchange().getResponse().getHeader("Location");
+        assertThat(location).contains("/week");
+    }
+
+    /** With DevTools open, Chrome fetches this on every page; it once became the page after logging in (a 404). */
+    @Test
+    void whatBrowsersFetchOnTheirOwnIsNotWhereLoggingInLands() {
+        MockHttpSession session = new MockHttpSession();
+        mvc.get().uri("/.well-known/appspecific/com.chrome.devtools.json").header("Accept", "*/*").session(session)
+                .exchange();
+        mvc.get().uri("/.well-known/security.txt").header("Accept", BROWSER_PAGE).session(session).exchange();
+        mvc.get().uri("/apple-touch-icon.png").header("Accept", "image/avif,image/webp,*/*").session(session).exchange();
+
+        assertThat(mvc.post().uri("/login").session(session).param("username", "rana.sec").param("password", "s3cret-pass")
+                .with(csrf())).headers().hasValue("Location", "/");
     }
 
     @Test

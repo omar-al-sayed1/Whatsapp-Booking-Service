@@ -1,6 +1,7 @@
 package app.clinicreminders.appointment;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -47,6 +48,15 @@ public interface AppointmentRepository extends Repository<Appointment, Long> {
             order by a.startsAt
             limit 1""")
     Optional<Appointment> findNextOpen(Long clinicId, Long patientId, Instant after);
+
+    /** The open (booked or confirmed) appointments still to come of these patients, earliest first: the Patients page. */
+    @Query("""
+            select a from Appointment a
+            where a.clinicId = :clinicId and a.patientId in :patientIds and a.startsAt > :after
+              and a.status in (app.clinicreminders.appointment.AppointmentStatus.BOOKED,
+                               app.clinicreminders.appointment.AppointmentStatus.CONFIRMED)
+            order by a.startsAt""")
+    List<Appointment> findUpcomingOf(Long clinicId, Collection<Long> patientIds, Instant after);
 
     /**
      * Books unless the doctor already has an active appointment starting then. Unlike

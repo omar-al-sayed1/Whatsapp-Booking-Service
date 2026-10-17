@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import app.clinicreminders.IntegrationTest;
@@ -136,5 +137,21 @@ class AppointmentRepositoryIT extends IntegrationTest {
     private Optional<Long> insert(Patient who, Instant start) {
         return appointments.insertUnlessTaken(clinic.getId(), doctor.getId(), who.getId(), start, start.plus(HALF_HOUR),
                 AppointmentSource.WHATSAPP.name());
+    }
+
+    @Test
+    void findUpcomingOfGivesOpenFutureAppointmentsOfThosePatientsInThisClinic() {
+        Patient other = data.patient(clinic);
+        Appointment soon = data.appointment(doctor, patient, FROM.plus(Duration.ofDays(1)), HALF_HOUR);
+        Appointment later = data.appointment(doctor, patient, FROM.plus(Duration.ofDays(2)), HALF_HOUR);
+        data.appointment(doctor, patient, FROM.minus(Duration.ofDays(1)), HALF_HOUR);
+        data.cancelledAppointment(doctor, other, FROM.plus(Duration.ofDays(1)).plus(HALF_HOUR), HALF_HOUR);
+        Appointment theirs = data.appointment(doctor, other, FROM.plus(Duration.ofDays(3)), HALF_HOUR);
+
+        assertThat(appointments.findUpcomingOf(clinic.getId(), List.of(patient.getId()), FROM))
+                .extracting(Appointment::getId).containsExactly(soon.getId(), later.getId());
+        assertThat(appointments.findUpcomingOf(clinic.getId(), List.of(other.getId()), FROM))
+                .extracting(Appointment::getId).containsExactly(theirs.getId());
+        assertThat(appointments.findUpcomingOf(data.clinic("B").getId(), List.of(patient.getId()), FROM)).isEmpty();
     }
 }

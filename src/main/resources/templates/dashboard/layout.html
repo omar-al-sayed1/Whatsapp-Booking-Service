@@ -1,45 +1,146 @@
 <!DOCTYPE html>
-<!--/* Shared page shell. Pages call page(title, active, content); lang and dir come from DashboardModel. */-->
+<!--/*
+  Shared page shell. Pages call page(title, active, content); lang and dir come from DashboardModel.
+  Logged in: sidebar (a bottom bar on phones) + content. Logged out (sign in, errors): content only.
+*/-->
 <html xmlns:th="http://www.thymeleaf.org" th:fragment="page(title, active, content)" th:lang="${lang}" th:dir="${dir}">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0e6f68">
     <title th:replace="${title}">Clinic Reminders</title>
+    <!--/* Before the stylesheet, so a saved theme or a collapsed sidebar never flashes. */-->
+    <script>try { var t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t;
+        if (localStorage.getItem("sidebar") === "collapsed") document.documentElement.dataset.sidebar = "collapsed"; } catch (e) {}</script>
+    <link rel="preload" th:href="@{/fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2}" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" th:href="@{/fonts/ibm-plex-sans-arabic-latin-400-normal.woff2}" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" th:href="@{/css/app.css}">
     <!--/* Keep the version in step with htmx.version in pom.xml. */-->
     <script th:src="@{/webjars/htmx.org/2.0.11/dist/htmx.min.js}" defer></script>
+    <script th:src="@{/js/app.js}" defer></script>
 </head>
 <body>
-<header class="topbar" th:if="${staff != null}">
-    <div class="brand">
-        <strong th:text="${clinicName} ?: #{app.name}">Clinic</strong>
+<th:block th:replace="~{dashboard/icons :: sprite}"></th:block>
+<div class="loading-bar" aria-hidden="true"></div>
+
+<div class="shell" th:if="${staff != null}">
+    <aside class="sidebar" id="sidebar">
+        <a class="brand" th:href="@{/}" th:title="${clinicName} ?: #{app.name}">
+            <span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="#i-mark"/></svg></span>
+            <span class="brand-text">
+                <span class="brand-name" th:text="${clinicName} ?: #{app.name}">Dr. Demo</span>
+                <span class="brand-sub" th:text="#{app.name}">Clinic Reminders</span>
+            </span>
+        </a>
+        <!--/* Collapses the sidebar to a rail of icons (computers only; app.js remembers the choice). */-->
+        <button type="button" class="side-toggle" data-sidebar-toggle data-key="[" aria-controls="sidebar" aria-expanded="true"
+                th:attr="data-label-collapse=#{nav.collapse},data-label-expand=#{nav.expand}"
+                aria-keyshortcuts="[" th:title="#{nav.collapse} + ' ([)'" th:aria-label="#{nav.collapse}">
+            <svg class="icon flip-rtl" aria-hidden="true"><use href="#i-chevron-left"/></svg></button>
+
+        <nav class="side-nav" th:if="${staff.clinicId() != null}" th:aria-label="#{app.name}">
+            <span class="nav-label" th:text="#{nav.section}">Clinic</span>
+            <a th:href="@{/}" th:classappend="${active == 'today'} ? 'active'" th:attr="aria-current=${active == 'today'} ? 'page'">
+                <svg class="icon" aria-hidden="true"><use href="#i-today"/></svg><span th:text="#{nav.today}">Today</span></a>
+            <a th:href="@{/week}" th:classappend="${active == 'week'} ? 'active'" th:attr="aria-current=${active == 'week'} ? 'page'">
+                <svg class="icon" aria-hidden="true"><use href="#i-week"/></svg><span th:text="#{nav.week}">Week</span></a>
+            <a th:href="@{/patients}" th:classappend="${active == 'patients'} ? 'active'" th:attr="aria-current=${active == 'patients'} ? 'page'">
+                <svg class="icon" aria-hidden="true"><use href="#i-users"/></svg><span th:text="#{nav.patients}">Patients</span></a>
+            <a th:href="@{/attention}" th:classappend="${active == 'attention'} ? 'active'" th:attr="aria-current=${active == 'attention'} ? 'page'">
+                <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg><span th:text="#{nav.attention}">Needs attention</span>
+                <span class="nav-badge" th:if="${attentionCount != null and attentionCount > 0}" th:text="${attentionCount}">2</span></a>
+            <a th:href="@{/settings}" th:classappend="${active == 'settings'} ? 'active'" th:attr="aria-current=${active == 'settings'} ? 'page'">
+                <svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg><span th:text="#{nav.settings}">Settings</span></a>
+        </nav>
+        <nav class="side-nav" th:if="${staff.clinicId() == null}" th:aria-label="#{app.name}">
+            <span class="nav-label" th:text="#{operator.title}">Operator</span>
+            <a th:href="@{/operator}" th:classappend="${active == 'operator'} ? 'active'" th:attr="aria-current=${active == 'operator'} ? 'page'">
+                <svg class="icon" aria-hidden="true"><use href="#i-building"/></svg><span th:text="#{nav.clinics}">Clinics</span></a>
+        </nav>
+
+        <div class="side-foot">
+            <details class="menu">
+                <summary th:aria-label="#{nav.menu}">
+                    <span class="avatar sm" th:style="'--hue:' + ${@avatars.hue(staff.username)}"
+                          th:text="${@avatars.initials(staff.username)}">OM</span>
+                    <span class="menu-who">
+                        <strong th:text="${staff.username}">owner</strong>
+                        <span th:text="#{'role.' + ${staff.role().name()}}">Owner</span>
+                    </span>
+                    <svg class="icon" aria-hidden="true"><use href="#i-chevron-up"/></svg>
+                </summary>
+                <div class="menu-panel">
+                    <div class="menu-title" th:text="#{theme.title}">Theme</div>
+                    <div class="theme-switch" role="group" th:aria-label="#{theme.title}">
+                        <button type="button" data-theme-choice="auto" aria-pressed="true">
+                            <svg class="icon" aria-hidden="true"><use href="#i-monitor"/></svg><span th:text="#{theme.auto}">Auto</span></button>
+                        <button type="button" data-theme-choice="light" aria-pressed="false">
+                            <svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg><span th:text="#{theme.light}">Light</span></button>
+                        <button type="button" data-theme-choice="dark" aria-pressed="false">
+                            <svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg><span th:text="#{theme.dark}">Dark</span></button>
+                    </div>
+                    <form method="post" th:action="@{/language}">
+                        <input type="hidden" name="lang" th:value="${otherLang}">
+                        <button type="submit" class="menu-item" th:lang="${otherLang}">
+                            <svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg>
+                            <span th:text="#{'language.switch.' + ${otherLang}}">English</span></button>
+                    </form>
+                    <a th:href="@{/account/password}"><svg class="icon" aria-hidden="true"><use href="#i-key"/></svg><span th:text="#{nav.password}">Password</span></a>
+                    <hr>
+                    <form method="post" th:action="@{/logout}">
+                        <button type="submit" class="menu-item"><svg class="icon flip-rtl" aria-hidden="true"><use href="#i-logout"/></svg>
+                            <span th:text="#{nav.logout}">Log out</span></button>
+                    </form>
+                </div>
+            </details>
+        </div>
+    </aside>
+
+    <div class="content">
+        <main th:replace="${content}">content</main>
     </div>
-    <nav class="nav" th:if="${staff.clinicId() != null}">
-        <a th:href="@{/}" th:classappend="${active == 'today'} ? 'active'" th:text="#{nav.today}">Today</a>
-        <a th:href="@{/week}" th:classappend="${active == 'week'} ? 'active'" th:text="#{nav.week}">Week</a>
-        <a th:href="@{/patients}" th:classappend="${active == 'patients'} ? 'active'" th:text="#{nav.patients}">Patients</a>
-        <a th:href="@{/attention}" th:classappend="${active == 'attention'} ? 'active'" th:text="#{nav.attention}">Needs attention</a>
-        <a th:href="@{/settings}" th:classappend="${active == 'settings'} ? 'active'" th:text="#{nav.settings}">Settings</a>
-    </nav>
-    <nav class="nav" th:if="${staff.clinicId() == null}">
-        <a th:href="@{/operator}" th:classappend="${active == 'operator'} ? 'active'" th:text="#{nav.clinics}">Clinics</a>
-    </nav>
-    <div class="account">
-        <form method="post" th:action="@{/language}" class="inline">
-            <input type="hidden" name="lang" th:value="${otherLang}">
-            <button type="submit" class="link" th:lang="${otherLang}" th:text="#{'language.switch.' + ${otherLang}}">English</button>
-        </form>
-        <span class="muted" th:text="${staff.username}">user</span>
-        <a th:href="@{/account/password}" th:classappend="${active == 'password'} ? 'active'" th:text="#{nav.password}">Password</a>
-        <form method="post" th:action="@{/logout}" class="inline">
-            <button type="submit" class="link" th:text="#{nav.logout}">Log out</button>
-        </form>
-    </div>
-</header>
-<div class="messages">
-    <p class="notice" role="status" th:if="${notice}" th:text="#{${notice}}">Saved.</p>
-    <p class="alert" role="alert" th:if="${error}" th:text="#{${error}}">Error</p>
 </div>
-<main th:replace="${content}">content</main>
+
+<th:block th:if="${staff == null}">
+    <main th:replace="${content}">content</main>
+</th:block>
+
+<div class="toasts" aria-live="polite">
+    <div class="toast" role="status" th:if="${notice}">
+        <svg class="icon toast-icon" aria-hidden="true"><use href="#i-check-circle"/></svg>
+        <p th:text="#{${notice}}">Saved.</p>
+        <button type="button" class="toast-close" th:aria-label="#{toast.close}"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="toast error" role="alert" th:if="${error}">
+        <svg class="icon toast-icon" aria-hidden="true"><use href="#i-alert"/></svg>
+        <p th:text="#{${error}}">Something went wrong.</p>
+        <button type="button" class="toast-close" th:aria-label="#{toast.close}"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+    </div>
+</div>
+
+<!--/* Slide-over for forms opened from a list (links with data-drawer); app.js fills it with htmx. */-->
+<dialog id="drawer" class="drawer" th:aria-label="#{app.name}">
+    <div class="drawer-head">
+        <button type="button" class="ghost icon-btn" data-drawer-close th:aria-label="#{toast.close}">
+            <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+    </div>
+    <div id="drawer-body" class="drawer-body"></div>
+</dialog>
+
+<dialog id="confirm-dialog" class="modal">
+    <form method="dialog">
+        <div class="modal-body">
+            <span class="modal-icon"><svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg></span>
+            <div>
+                <h2 th:text="#{dialog.title}">Are you sure?</h2>
+                <p data-question>Question</p>
+            </div>
+        </div>
+        <div class="modal-actions">
+            <button type="submit" value="no" th:text="#{dialog.cancel}" autofocus>Go back</button>
+            <button type="submit" value="yes" class="danger-solid" th:text="#{dialog.confirm}">Yes, continue</button>
+        </div>
+    </form>
+</dialog>
 </body>
 </html>

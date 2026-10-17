@@ -5,14 +5,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="${status} ?: 'Error'">Error</title>
+    <script>try { var t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}</script>
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
 <body>
-<main class="container narrow">
-    <div class="card">
-        <h1 th:text="${status == 404} ? 'Page not found' : 'Something went wrong'">Something went wrong</h1>
-        <p lang="ar" dir="rtl" th:text="${status == 404} ? 'الصفحة غير موجودة' : 'حدث خطأ ما'">حدث خطأ ما</p>
-        <p><a th:href="@{/}">← Today / اليوم</a></p>
+<main class="error-page">
+    <div class="centered">
+        <section class="card">
+            <div class="error-code" th:text="${status} ?: '500'">404</div>
+            <h1 th:text="${status == 404} ? 'Page not found' : 'Something went wrong'">Something went wrong</h1>
+            <p lang="ar" dir="rtl" class="muted" th:text="${status == 404} ? 'الصفحة غير موجودة' : 'حدث خطأ ما'">حدث خطأ ما</p>
+            <a class="button primary" th:href="@{/}">Today · اليوم</a>
+        </section>
     </div>
 </main>
 </body>

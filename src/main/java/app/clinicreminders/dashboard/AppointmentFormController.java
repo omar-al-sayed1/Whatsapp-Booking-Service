@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Optional;
 
 import app.clinicreminders.appointment.Appointment;
 import app.clinicreminders.appointment.AppointmentRepository;
@@ -29,6 +30,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -44,6 +46,14 @@ class AppointmentFormController {
 
     /** A free slot as offered in the form: value "HH:mm" in clinic time, and its label. */
     record SlotOption(String value, String label) {
+    }
+
+    /**
+     * A patient offered by the picker.
+     *
+     * @param upcoming their latest appointment is still to come, so {@code when} is a booking, not a past visit
+     */
+    record PickerRow(String name, String phone, String language, boolean optedOut, String when, boolean upcoming) {
     }
 
     /** What the form shows and posts back. */
@@ -75,13 +85,44 @@ class AppointmentFormController {
     String newAppointment(@AuthenticationPrincipal StaffPrincipal staff, HttpServletRequest request, Model model,
                           @RequestParam(required = false) Long doctorId,
                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-                          @RequestParam(required = false) String time) {
+                          @RequestParam(required = false) String time,
+                          @RequestParam(defaultValue = "") String phone, @RequestParam(defaultValue = "") String name) {
         Ctx ctx = context.of(staff, request);
         List<Doctor> active = activeDoctors(ctx);
         Long doctor = doctorId != null ? doctorId : active.isEmpty() ? null : active.getFirst().getId();
-        Form form = new Form(null, doctor, date != null ? date : ctx.today(), time == null ? "" : time, "", "", "",
-                ctx.clinic().getDefaultLanguage().code(), null);
+        // Booking a known patient (from the Patients page): their language, not the clinic default.
+        String language = Optional.ofNullable(PhoneNumbers.parseLebanese(phone))
+                .flatMap(phoneE164 -> patients.findByClinicIdAndPhoneE164(ctx.clinicId(), phoneE164))
+                .map(patient -> patient.getLanguage().code())
+                .orElse(ctx.clinic().getDefaultLanguage().code());
+        Form form = new Form(null, doctor, date != null ? date : ctx.today(), time == null ? "" : time, "", phone, name,
+                language, null);
         return showForm(ctx, form, null, model);
+    }
+
+    /** The patient picker: patients booked at least once, latest first, matching what was typed. */
+    @GetMapping("/appointments/patients")
+    String patientPicker(@AuthenticationPrincipal StaffPrincipal staff, HttpServletRequest request, Model model,
+                         @RequestParam(defaultValue = "") String q) {
+        Ctx ctx = context.of(staff, request);
+        model.addAttribute("pickerQuery", q.strip());
+        model.addAttribute("picked", patientService.searchBooked(ctx.clinicId(), q).stream()
+                .map(p -> new PickerRow(p.name(), p.phoneE164(), p.language().code(), p.optedOut(),
+                        ctx.formats().dayShort(ctx.dateOf(p.lastAppointment())), p.lastAppointment().isAfter(ctx.now())))
+                .toList());
+        return "dashboard/appointment-form :: patient-results";
+    }
+
+    /** As the secretary types a phone number: is this a patient we know, or a new one? */
+    @GetMapping("/appointments/patient-hint")
+    String patientHint(@AuthenticationPrincipal StaffPrincipal staff, HttpServletRequest request, Model model,
+                       @RequestParam(defaultValue = "") String phone) {
+        Ctx ctx = context.of(staff, request);
+        String phoneE164 = PhoneNumbers.parseLebanese(phone);
+        model.addAttribute("hintPhone", phoneE164);
+        model.addAttribute("hintPatient", phoneE164 == null ? null
+                : patients.findByClinicIdAndPhoneE164(ctx.clinicId(), phoneE164).orElse(null));
+        return "dashboard/appointment-form :: patient-hint";
     }
 
     @GetMapping("/appointments/slots")
@@ -102,7 +143,8 @@ class AppointmentFormController {
                 @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                 @RequestParam(defaultValue = "") String time, @RequestParam(defaultValue = "") String otherTime,
                 @RequestParam(defaultValue = "") String phone, @RequestParam(defaultValue = "") String name,
-                @RequestParam(defaultValue = "ar") String language) {
+                @RequestParam(defaultValue = "ar") String language,
+                @ModelAttribute("returnTo") String returnTo) {
         Ctx ctx = context.of(staff, request);
         Form form = new Form(null, doctorId, date, time, otherTime, phone, name, language, null);
         LocalTime start = startTime(time, otherTime);
@@ -128,9 +170,7 @@ class AppointmentFormController {
         } catch (SlotTakenException e) {
             return showForm(ctx, form, "error.slot-taken", model);
         }
-        redirect.addFlashAttribute("notice", "notice.booked");
-        redirect.addAttribute("date", date);
-        return "redirect:/";
+        return afterSave(redirect, "notice.booked", doctorId, date, returnTo);
     }
 
     @GetMapping("/appointments/{id}/reschedule")
@@ -147,7 +187,8 @@ class AppointmentFormController {
     String reschedule(@PathVariable long id, @AuthenticationPrincipal StaffPrincipal staff, HttpServletRequest request,
                       Model model, RedirectAttributes redirect,
                       @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-                      @RequestParam(defaultValue = "") String time, @RequestParam(defaultValue = "") String otherTime) {
+                      @RequestParam(defaultValue = "") String time, @RequestParam(defaultValue = "") String otherTime,
+                      @ModelAttribute("returnTo") String returnTo) {
         Ctx ctx = context.of(staff, request);
         Appointment appointment = movable(ctx, id);
         Form form = rescheduleForm(ctx, appointment, date, time, otherTime);
@@ -160,7 +201,24 @@ class AppointmentFormController {
         } catch (SlotTakenException e) {
             return showForm(ctx, form, "error.slot-taken", model);
         }
-        redirect.addFlashAttribute("notice", "notice.moved");
+        return afterSave(redirect, "notice.moved", appointment.getDoctorId(), date, returnTo);
+    }
+
+    /**
+     * "week" when the form was opened from Week, so saving goes back there; the form posts it back.
+     * Anything else means Today.
+     */
+    @ModelAttribute("returnTo")
+    String returnTo(@RequestParam(defaultValue = "") String returnTo) {
+        return returnTo.equals("week") ? "week" : "";
+    }
+
+    private static String afterSave(RedirectAttributes redirect, String notice, long doctorId, LocalDate date,
+                                    String returnTo) {
+        redirect.addFlashAttribute("notice", notice);
+        if (returnTo.equals("week")) {
+            return WeekController.redirectToWeek(redirect, doctorId, date);
+        }
         redirect.addAttribute("date", date);
         return "redirect:/";
     }
@@ -169,7 +227,12 @@ class AppointmentFormController {
         model.addAttribute("form", form);
         model.addAttribute("doctors", form.appointmentId() == null ? activeDoctors(ctx) : List.of());
         model.addAttribute("slots", form.doctorId() == null ? List.of() : slotOptions(ctx, form.doctorId(), form.date()));
-        model.addAttribute("error", error);
+        String phoneE164 = PhoneNumbers.parseLebanese(form.phone());
+        model.addAttribute("hintPhone", phoneE164);
+        model.addAttribute("hintPatient", phoneE164 == null ? null
+                : patients.findByClinicIdAndPhoneE164(ctx.clinicId(), phoneE164).orElse(null));
+        // Not "error": the layout turns that into a toast; the form shows its own next to the fields.
+        model.addAttribute("formError", error);
         return "dashboard/appointment-form";
     }
 

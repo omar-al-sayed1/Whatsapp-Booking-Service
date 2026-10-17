@@ -31,7 +31,7 @@ If a library isn't compatible with Spring Boot 4 yet, tell me before downgrading
 ## Commands
 
 - Start the database: `docker compose up -d db`
-- Run in dev mode (fake WhatsApp): `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev`
+- Run in dev mode (fake WhatsApp): `./mvnw spring-boot:run "-Dspring-boot.run.profiles=dev"`
 - Run all tests: `./mvnw verify` (needs Docker: `*IT` classes use Testcontainers)
 - Unit tests only, no Docker: `./mvnw test` (`*Test` classes)
 - Health check: `http://localhost:8080/actuator/health`
@@ -39,10 +39,10 @@ If a library isn't compatible with Spring Boot 4 yet, tell me before downgrading
   `operator` / `dev` (created by `DevDataInitializer`, dev profile only)
 - Operator pages (onboarding clinics): `http://localhost:8080/operator`
 - First operator login on a new server: `java -jar app.jar --create-operator=<username>` (locally:
-  `./mvnw spring-boot:run -Dspring-boot.run.arguments=--create-operator=<username>`). Prints a
+  `./mvnw spring-boot:run "-Dspring-boot.run.arguments=--create-operator=<username>"`). Prints a
   generated password once and exits; running it again gives that operator a new password.
 - Demo clinic for sales demos: add `--seed-demo` the same way (with the dev profile locally, e.g.
-  `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev -Dspring-boot.run.arguments=--seed-demo`).
+  `./mvnw spring-boot:run "-Dspring-boot.run.profiles=dev" "-Dspring-boot.run.arguments=--seed-demo"`).
   Creates or refreshes "Dr. Demo" around today, prints the `drdemo` login and exits. Commands run on a
   random port without schedulers, so they work while the app is running.
 - WhatsApp simulator (dev profile only): `http://localhost:8080/dev/whatsapp`

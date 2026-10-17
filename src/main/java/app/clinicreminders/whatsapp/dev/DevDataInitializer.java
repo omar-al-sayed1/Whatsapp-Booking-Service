@@ -75,7 +75,7 @@ class DevDataInitializer implements ApplicationRunner {
         clinic.connectWhatsApp(DEV_PHONE_NUMBER_ID, "dev-waba", null);
         clinic.changeContactDetails("Main street, Zahle", "Monday to Saturday, 9:00 to 13:00");
         clinic = clinics.save(clinic);
-        Doctor doctor = doctors.save(new Doctor(clinic.getId(), "Dr. Dev", 30));
+        Doctor doctor = doctors.save(new Doctor(clinic.getId(), "Dr. Dev", clinic.getSlotMinutes()));
         for (DayOfWeek day : DayOfWeek.values()) {
             if (day != DayOfWeek.SUNDAY) {
                 rules.save(new ScheduleRule(clinic.getId(), doctor.getId(), day,

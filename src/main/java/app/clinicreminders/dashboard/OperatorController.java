@@ -16,9 +16,11 @@ import app.clinicreminders.reminder.ReminderKind;
 import app.clinicreminders.reminder.ReminderMessages;
 import app.clinicreminders.scheduling.Doctor;
 import app.clinicreminders.scheduling.DoctorRepository;
+import app.clinicreminders.scheduling.ScheduleSettings;
 import app.clinicreminders.staff.StaffAccounts;
 import app.clinicreminders.staff.StaffAccounts.NewPassword;
 import app.clinicreminders.staff.StaffRole;
+import app.clinicreminders.staff.StaffUser;
 import app.clinicreminders.staff.UsernameTakenException;
 import app.clinicreminders.whatsapp.OutboundMessage.TemplateMessage;
 import app.clinicreminders.whatsapp.WhatsAppConnections;
@@ -50,8 +52,17 @@ class OperatorController {
     static final String HELLO_WORLD = "hello_world";
     static final String HELLO_WORLD_LANGUAGE = "en_US";
 
-    record ClinicRow(long id, String name, String timezone, String language, boolean connected, long logins) {
+    /** @param ready how many of the {@link #SETUP_STEPS} onboarding steps are done */
+    record ClinicRow(long id, String name, String timezone, String language, int slotMinutes, boolean connected, long logins,
+                     int ready) {
+
+        public int readyPercent() {
+            return 100 * ready / SETUP_STEPS;
+        }
     }
+
+    /** Details, phone number id, business account id, access token, a login. */
+    static final int SETUP_STEPS = 5;
 
     /** The result of a test message, shown once on the clinic page. */
     record TestOutcome(String result, String detail) {
@@ -60,6 +71,7 @@ class OperatorController {
     private final ClinicSettings clinics;
     private final WhatsAppConnections connections;
     private final StaffAccounts accounts;
+    private final ScheduleSettings scheduleSettings;
     private final WhatsAppMessenger messenger;
     private final ReminderMessages reminderMessages;
     private final DoctorRepository doctors;
@@ -67,11 +79,13 @@ class OperatorController {
     private final Clock clock;
 
     OperatorController(ClinicSettings clinics, WhatsAppConnections connections, StaffAccounts accounts,
+                       ScheduleSettings scheduleSettings,
                        WhatsAppMessenger messenger, ReminderMessages reminderMessages, DoctorRepository doctors,
                        MessageSource messages, Clock clock) {
         this.clinics = clinics;
         this.connections = connections;
         this.accounts = accounts;
+        this.scheduleSettings = scheduleSettings;
         this.messenger = messenger;
         this.reminderMessages = reminderMessages;
         this.doctors = doctors;
@@ -82,25 +96,35 @@ class OperatorController {
     @GetMapping
     String clinics(Model model) {
         List<ClinicRow> rows = clinics.all().stream()
-                .map(c -> new ClinicRow(c.getId(), c.getName(), c.getTimezone().getId(), c.getDefaultLanguage().code(),
-                        c.getWaPhoneNumberId() != null && c.getWaAccessTokenEncrypted() != null,
-                        accounts.countLogins(c.getId())))
+                .map(c -> {
+                    long logins = accounts.countLogins(c.getId());
+                    return new ClinicRow(c.getId(), c.getName(), c.getTimezone().getId(), c.getDefaultLanguage().code(),
+                            c.getSlotMinutes(), c.getWaPhoneNumberId() != null && c.getWaAccessTokenEncrypted() != null, logins,
+                            readySteps(c, logins));
+                })
                 .toList();
         model.addAttribute("clinics", rows);
         model.addAttribute("defaultZone", Clinic.DEFAULT_ZONE.getId());
+        model.addAttribute("steps", SETUP_STEPS);
         return "dashboard/operator";
     }
 
     @PostMapping("/clinics")
     String create(RedirectAttributes redirect, @RequestParam(defaultValue = "") String name,
-                  @RequestParam(defaultValue = "") String timezone, @RequestParam String defaultLanguage) {
+                  @RequestParam(defaultValue = "") String timezone, @RequestParam String defaultLanguage,
+                  @RequestParam(defaultValue = "" + Clinic.DEFAULT_SLOT_MINUTES) int slotMinutes) {
         ZoneId zone = zone(timezone);
         if (zone == null) {
             redirect.addFlashAttribute("error", "error.timezone");
             return "redirect:/operator";
         }
+        if (!validSlotMinutes(slotMinutes)) {
+            redirect.addFlashAttribute("error", "error.slot-length");
+            return "redirect:/operator";
+        }
         try {
             Clinic clinic = clinics.create(name, zone, Language.fromCode(defaultLanguage));
+            scheduleSettings.changeSlotLength(clinic.getId(), slotMinutes);
             redirect.addFlashAttribute("notice", "notice.saved");
             return "redirect:/operator/clinics/" + clinic.getId();
         } catch (IllegalArgumentException e) {
@@ -114,7 +138,10 @@ class OperatorController {
         Clinic clinic = clinics.get(id);
         model.addAttribute("clinic", clinic);
         model.addAttribute("connection", connections.connection(id));
-        model.addAttribute("logins", accounts.logins(id));
+        List<StaffUser> logins = accounts.logins(id);
+        model.addAttribute("logins", logins);
+        model.addAttribute("ready", readySteps(clinic, logins.size()));
+        model.addAttribute("steps", SETUP_STEPS);
         model.addAttribute("roles", List.of(StaffRole.OWNER, StaffRole.SECRETARY));
         model.addAttribute("webhookUrl", ServletUriComponentsBuilder.fromCurrentContextPath()
                 .path("/webhooks/whatsapp").toUriString());
@@ -123,14 +150,21 @@ class OperatorController {
 
     @PostMapping("/clinics/{id}")
     String updateDetails(@PathVariable long id, RedirectAttributes redirect, @RequestParam(defaultValue = "") String name,
-                         @RequestParam(defaultValue = "") String timezone, @RequestParam String defaultLanguage) {
+                         @RequestParam(defaultValue = "") String timezone, @RequestParam String defaultLanguage,
+                         @RequestParam(defaultValue = "" + Clinic.DEFAULT_SLOT_MINUTES) int slotMinutes) {
         ZoneId zone = zone(timezone);
         if (zone == null) {
             redirect.addFlashAttribute("error", "error.timezone");
             return redirectTo(id);
         }
+        if (!validSlotMinutes(slotMinutes)) {
+            redirect.addFlashAttribute("error", "error.slot-length");
+            return redirectTo(id);
+        }
         try {
             clinics.updateDetails(id, name, zone, Language.fromCode(defaultLanguage));
+            // Every doctor of the clinic follows it; booked appointments keep their times.
+            scheduleSettings.changeSlotLength(id, slotMinutes);
             redirect.addFlashAttribute("notice", "notice.saved");
         } catch (IllegalArgumentException e) {
             redirect.addFlashAttribute("error", "error.clinic-name");
@@ -240,6 +274,16 @@ class OperatorController {
         LocalDate tomorrow = LocalDate.ofInstant(clock.instant(), clinic.getTimezone()).plusDays(1);
         return reminderMessages.reminder(ReminderKind.H24, patient, doctor,
                 tomorrow.atTime(LocalTime.of(10, 0)).atZone(clinic.getTimezone()).toInstant(), clinic.getTimezone());
+    }
+
+    private static boolean validSlotMinutes(int minutes) {
+        return minutes >= 5 && minutes <= 240;
+    }
+
+    /** The clinic itself counts as the first step. */
+    static int readySteps(Clinic clinic, long logins) {
+        return 1 + (clinic.getWaPhoneNumberId() != null ? 1 : 0) + (clinic.getWaBusinessAccountId() != null ? 1 : 0)
+                + (clinic.getWaAccessTokenEncrypted() != null ? 1 : 0) + (logins > 0 ? 1 : 0);
     }
 
     private static String errorKey(ConnectionException e) {

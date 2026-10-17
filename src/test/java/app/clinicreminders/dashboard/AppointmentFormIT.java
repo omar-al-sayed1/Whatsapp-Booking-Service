@@ -52,6 +52,70 @@ class AppointmentFormIT extends DashboardTest {
     }
 
     @Test
+    void typingAPhoneSaysWhetherThePatientIsKnown() {
+        data.patient(clinic, "Rana Haddad", "+96170123456", Language.AR);
+        data.patient(data.clinic("B"), "Someone Else", "+96171999999", Language.EN);
+
+        assertThat(get(staff, "/appointments/patient-hint?phone=70 123 456")).hasStatusOk().bodyText()
+                .contains("id=\"patient-hint\"", "Known patient: Rana Haddad").doesNotContain("<html");
+        assertThat(get(staff, "/appointments/patient-hint?phone=71 999 999")).bodyText()
+                .as("another clinic's patient is a new patient here").contains("New patient");
+        assertThat(get(staff, "/appointments/patient-hint?phone=12")).bodyText()
+                .doesNotContain("Known patient", "New patient");
+    }
+
+    @Test
+    void thePickerOffersPatientsBookedBeforeAndSaysWhenTheyAreBooked() {
+        Patient rana = data.patient(clinic, "Rana Haddad", "+96170123456", Language.AR);
+        data.appointment(doctor, rana, NINE, Duration.ofMinutes(30));
+        data.patient(clinic, "Rania Never Booked", "+96171000002", Language.AR);
+
+        assertThat(get(staff, "/appointments/patients")).hasStatusOk().bodyText()
+                .contains("id=\"patient-results\"", "Recently booked", "Rana Haddad", "data-phone=\"+96170123456\"",
+                        "Booked for Wed 21 Oct")
+                .doesNotContain("Rania Never Booked", "<html");
+        assertThat(get(staff, "/appointments/patients?q=haddad")).bodyText()
+                .contains("Matching patients", "Rana Haddad");
+        assertThat(get(staff, "/appointments/patients?q=zzz")).bodyText()
+                .contains("No patient with an earlier appointment matches.");
+    }
+
+    @Test
+    void theDropdownStartsEmptyAndSaysWhenNobodyWasBookedYet() {
+        assertThat(get(staff, "/appointments/new?doctorId={d}&date={date}", doctor.getId(), DATE)).bodyText()
+                .contains("data-combo", "Choose a patient booked before", "id=\"combo-panel\"");
+        assertThat(get(staff, "/appointments/patients")).bodyText()
+                .contains("No patient has been booked yet.", "Type the new patient&#39;s details below.");
+    }
+
+    @Test
+    void bookingFromWeekGoesBackToWeek() {
+        assertThat(get(staff, "/appointments/new?doctorId={d}&date={date}&time=09:00&returnTo=week", doctor.getId(), DATE))
+                .bodyText().contains("name=\"returnTo\" value=\"week\"", "/week?doctorId=" + doctor.getId());
+
+        assertThat(post(staff, "/appointments").param("doctorId", doctor.getId().toString()).param("date", DATE)
+                .param("time", "09:00").param("phone", "70123456").param("name", "Karim").param("language", "en")
+                .param("returnTo", "week"))
+                .hasRedirectedUrl("/week?doctorId=" + doctor.getId() + "&start=2026-10-19")
+                .flash().containsEntry("notice", "notice.booked");
+    }
+
+    @Test
+    void bookingFromThePatientsPageStartsWithTheirDetails() {
+        data.patient(clinic, "Rana Haddad", "+96170123456", Language.AR);
+
+        assertThat(get(staff, "/appointments/new?phone={phone}&name={name}", "70123456", "Rana Haddad")).hasStatusOk()
+                .bodyText().contains("value=\"70123456\"", "value=\"Rana Haddad\"", "Known patient: Rana Haddad")
+                .as("the dropdown shows them").contains(">Rana Haddad</strong>", ">+96170123456</span>");
+    }
+
+    @Test
+    void anErrorIsShownWithTheFormNotAsAToast() {
+        assertThat(book("09:00", "", "12", "Karim", "en")).hasStatusOk().bodyText()
+                .contains("class=\"alert\"").doesNotContain("class=\"toast error\"");
+    }
+
+    @Test
     void theFormOffersTheDoctorsFreeTimes() {
         existing(NINE.plus(Duration.ofMinutes(30)));
 

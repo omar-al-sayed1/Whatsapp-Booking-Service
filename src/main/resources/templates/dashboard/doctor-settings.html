@@ -2,83 +2,108 @@
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'settings', ~{::main})}">
 <head><title th:text="${doctor.displayName}">Dr. Khoury</title></head>
 <body>
-<main class="container narrow">
-    <p><a th:href="@{/settings}" th:text="#{action.back}">Back</a></p>
-    <h1 th:text="${doctor.displayName}">Dr. Khoury</h1>
+<main class="container">
+    <a class="back-link" th:href="@{/settings(tab='doctors')}">
+        <svg class="icon flip-rtl" aria-hidden="true"><use href="#i-chevron-left"/></svg><span th:text="#{settings.doctors}">Doctors</span></a>
+    <header class="page-head">
+        <div class="appt-who">
+            <span class="avatar lg" th:style="'--hue:' + ${@avatars.hue(doctor.displayName)}" th:text="${@avatars.initials(doctor.displayName)}">DK</span>
+            <div>
+                <h1 th:text="${doctor.displayName}">Dr. Khoury</h1>
+                <div class="tags">
+                    <span class="tag"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
+                        <span th:text="#{settings.doctor.minutes(${doctor.slotMinutes + ''})}">30 min</span></span>
+                    <span class="chip" th:classappend="${doctor.active} ? 'chip-CONFIRMED' : 'chip-CANCELLED'"
+                          th:text="${doctor.active} ? #{settings.doctor.active} : #{settings.doctor.inactive}">Taking appointments</span>
+                </div>
+            </div>
+        </div>
+    </header>
 
     <section class="card">
-        <form method="post" th:action="@{/settings/doctors/{id}(id=${doctor.id})}" class="stack">
-            <label><span th:text="#{settings.doctor.name}">Name</span>
-                <input type="text" name="displayName" th:value="${doctor.displayName}" required></label>
-            <label><span th:text="#{settings.doctor.slot}">Slot length</span>
-                <input type="number" name="slotMinutes" th:value="${doctor.slotMinutes}" min="5" max="240" step="5" required></label>
-            <label class="check">
-                <input type="checkbox" name="active" value="true" th:checked="${doctor.active}">
-                <span th:text="#{settings.doctor.active}">Taking appointments</span>
-            </label>
-            <div class="buttons"><button type="submit" class="primary" th:text="#{action.save}">Save</button></div>
-        </form>
-    </section>
-
-    <section class="card">
-        <h2 th:text="#{settings.hours}">Weekly hours</h2>
-        <table class="list">
-            <tbody>
-            <tr th:each="day : ${week}">
-                <th scope="row" th:text="${day.day()}">Monday</th>
-                <td>
-                    <span class="muted" th:if="${day.windows().isEmpty()}" th:text="#{settings.hours.closed}">Closed</span>
-                    <span class="window" th:each="w : ${day.windows()}">
+        <div class="section-head"><h2 th:text="#{settings.hours}">Weekly hours</h2></div>
+        <div class="hours-week">
+            <div class="hours-row" th:each="day : ${week}">
+                <span class="day-name" th:text="${day.day()}">Monday</span>
+                <div class="hours-track">
+                    <span class="closed-label" th:if="${day.windows().isEmpty()}" th:text="#{settings.hours.closed}">Closed</span>
+                    <div class="hours-seg" th:each="w : ${day.windows()}" th:title="${w.hours()}"
+                         th:style="'inset-inline-start:' + ${w.left()} + '%;width:' + ${w.width()} + '%'">
                         <span th:text="${w.hours()}" dir="auto">9:00 AM – 1:00 PM</span>
-                        <form method="post" class="inline" th:action="@{/settings/hours/{rule}/delete(rule=${w.id()})}">
+                        <form method="post" th:action="@{/settings/hours/{rule}/delete(rule=${w.id()})}">
                             <input type="hidden" name="doctorId" th:value="${doctor.id}">
-                            <button type="submit" class="link danger" th:aria-label="#{action.delete}">×</button>
+                            <button type="submit" th:title="#{action.delete}" th:aria-label="#{action.delete}">
+                                <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
                         </form>
-                    </span>
-                </td>
-            </tr>
-            </tbody>
-        </table>
-        <h3 th:text="#{settings.hours.add}">Add hours</h3>
-        <form method="post" th:action="@{/settings/doctors/{id}/hours(id=${doctor.id})}" class="row">
+                    </div>
+                </div>
+            </div>
+            <div class="hours-scale" aria-hidden="true">
+                <span></span>
+                <div><span>6</span><span>8</span><span>10</span><span>12</span><span>14</span><span>16</span><span>18</span><span>20</span><span>22</span></div>
+            </div>
+        </div>
+        <form method="post" th:action="@{/settings/doctors/{id}/hours(id=${doctor.id})}" class="inline-form">
             <label><span th:text="#{settings.day}">Day</span>
                 <select name="day">
                     <option th:each="d : ${weekdays}" th:value="${d[0]}" th:text="${d[1]}">Monday</option>
                 </select></label>
             <label><span th:text="#{settings.from}">From</span><input type="time" name="start" value="09:00" required></label>
             <label><span th:text="#{settings.to}">To</span><input type="time" name="end" value="13:00" required></label>
-            <button type="submit" th:text="#{action.add}">Add</button>
+            <button type="submit" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                <span th:text="#{settings.hours.add}">Add hours</span></button>
         </form>
     </section>
 
-    <section class="card">
-        <h2 th:text="#{settings.days}">Days off and special hours</h2>
-        <p class="muted" th:if="${daysOff.isEmpty()}" th:text="#{settings.days.none}">None coming up.</p>
-        <table class="list" th:unless="${daysOff.isEmpty()}">
-            <tbody>
-            <tr th:each="d : ${daysOff}">
-                <td th:text="${d.date()}">Wednesday 25 December 2026</td>
-                <td th:text="${d.hours()} ?: #{settings.days.closed}" dir="auto">Closed all day</td>
-                <td class="actions">
+    <div class="grid-2">
+        <section class="card">
+            <div class="section-head"><h2 th:text="#{settings.profile}">Profile</h2></div>
+            <form method="post" th:action="@{/settings/doctors/{id}(id=${doctor.id})}" class="stack">
+                <label><span th:text="#{settings.doctor.name}">Name</span>
+                    <input type="text" name="displayName" th:value="${doctor.displayName}" required></label>
+                <p class="hint"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
+                    <span th:text="#{settings.slot-length.set-by-operator(${doctor.slotMinutes + ''})}">Appointments are 20 minutes long.</span></p>
+                <label class="setting">
+                    <span><strong th:text="#{settings.doctor.active}">Taking appointments</strong>
+                        <span class="hint" th:text="#{settings.doctor.active.hint}">Off: no new bookings; existing ones stay.</span></span>
+                    <input type="checkbox" class="switch" name="active" value="true" th:checked="${doctor.active}">
+                </label>
+                <div class="form-actions">
+                    <button type="submit" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>
+                        <span th:text="#{action.save}">Save</span></button>
+                </div>
+            </form>
+        </section>
+
+        <section class="card">
+            <div class="section-head"><h2 th:text="#{settings.days}">Days off and special hours</h2></div>
+            <p class="muted" th:if="${daysOff.isEmpty()}" th:text="#{settings.days.none}">None coming up.</p>
+            <ul class="dayoff-list" th:unless="${daysOff.isEmpty()}">
+                <li class="dayoff" th:each="d : ${daysOff}">
+                    <span class="date-chip"><span th:text="${d.month()}">Dec</span><b th:text="${d.dayOfMonth()}">25</b></span>
+                    <span class="grow">
+                        <strong th:text="${d.date()}">Friday 25 December 2026</strong><br>
+                        <span class="muted small" th:text="${d.hours()} ?: #{settings.days.closed}" dir="auto">Closed all day</span>
+                    </span>
                     <form method="post" th:action="@{/settings/days/{id}/delete(id=${d.id()})}">
                         <input type="hidden" name="doctorId" th:value="${doctor.id}">
-                        <button type="submit" class="danger" th:text="#{action.delete}">Delete</button>
+                        <button type="submit" class="sm danger icon-btn" th:title="#{action.delete}" th:aria-label="#{action.delete}">
+                            <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button>
                     </form>
-                </td>
-            </tr>
-            </tbody>
-        </table>
-        <h3 th:text="#{settings.days.add}">Add a day</h3>
-        <form method="post" th:action="@{/settings/doctors/{id}/days(id=${doctor.id})}" class="row">
-            <label><span th:text="#{settings.date}">Date</span>
-                <input type="date" name="date" th:min="${today}" required></label>
-            <label class="check"><input type="checkbox" name="closed" value="true" checked>
-                <span th:text="#{settings.days.closed}">Closed all day</span></label>
-            <label><span th:text="#{settings.from}">From</span><input type="time" name="start"></label>
-            <label><span th:text="#{settings.to}">To</span><input type="time" name="end"></label>
-            <button type="submit" th:text="#{action.add}">Add</button>
-        </form>
-    </section>
+                </li>
+            </ul>
+            <form method="post" th:action="@{/settings/doctors/{id}/days(id=${doctor.id})}" class="inline-form">
+                <label><span th:text="#{settings.date}">Date</span>
+                    <input type="date" name="date" th:min="${today}" required></label>
+                <label class="check"><input type="checkbox" name="closed" value="true" checked>
+                    <span th:text="#{settings.days.closed}">Closed all day</span></label>
+                <label><span th:text="#{settings.from}">From</span><input type="time" name="start"></label>
+                <label><span th:text="#{settings.to}">To</span><input type="time" name="end"></label>
+                <button type="submit"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                    <span th:text="#{settings.days.add}">Add a day</span></button>
+            </form>
+        </section>
+    </div>
 </main>
 </body>
 </html>

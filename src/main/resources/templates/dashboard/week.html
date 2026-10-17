@@ -3,38 +3,130 @@
 <head><title th:text="#{week.title}">Week</title></head>
 <body>
 <main class="container">
-    <div class="toolbar">
-        <h1 th:text="${weekLabel}">Mon 2 Nov – Sun 8 Nov</h1>
-        <nav class="day-nav">
-            <a class="button" th:href="@{/week(doctorId=${doctor?.id}, start=${previousStart})}" th:text="#{week.previous}">Previous week</a>
-            <a class="button" th:href="@{/week(doctorId=${doctor?.id}, start=${nextStart})}" th:text="#{week.next}">Next week</a>
+    <header class="page-head">
+        <div>
+            <div class="eyebrow"><svg class="icon" aria-hidden="true"><use href="#i-week"/></svg><span th:text="#{week.title}">Week</span></div>
+            <h1 th:text="${weekLabel}">Mon 2 Nov – Sun 8 Nov</h1>
+        </div>
+        <div class="head-actions">
+            <nav class="segmented" th:aria-label="#{week.title}">
+                <a class="icon-btn" th:href="@{/week(doctorId=${doctor?.id}, start=${previousStart})}"
+                   th:title="#{week.previous}" th:aria-label="#{week.previous}"
+                   th:attr="data-key=${dir == 'rtl'} ? 'ArrowRight' : 'ArrowLeft'">
+                    <svg class="icon flip-rtl" aria-hidden="true"><use href="#i-chevron-left"/></svg></a>
+                <a th:href="@{/week(doctorId=${doctor?.id})}" th:classappend="${thisWeek} ? 'current'" data-key="t"
+                   th:text="#{week.this-week}">This week</a>
+                <a class="icon-btn" th:href="@{/week(doctorId=${doctor?.id}, start=${nextStart})}"
+                   th:title="#{week.next}" th:aria-label="#{week.next}"
+                   th:attr="data-key=${dir == 'rtl'} ? 'ArrowLeft' : 'ArrowRight'">
+                    <svg class="icon flip-rtl" aria-hidden="true"><use href="#i-chevron-right"/></svg></a>
+            </nav>
+            <a class="button primary" th:if="${doctor != null}" th:href="@{/appointments/new(doctorId=${doctor.id}, date=${monday})}"
+               data-drawer data-key="n">
+                <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg><span th:text="#{today.add}">Add appointment</span>
+                <kbd class="kbd-hint">N</kbd></a>
+        </div>
+    </header>
+
+    <div class="card empty" th:if="${doctors.isEmpty()}">
+        <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg></span>
+        <strong th:text="#{week.no-doctors}">No active doctors.</strong>
+        <a class="button primary sm" th:href="@{/settings(tab='doctors')}"><span th:text="#{nav.settings}">Settings</span></a>
+    </div>
+
+    <th:block th:unless="${doctors.isEmpty()}">
+        <nav class="doctor-tabs" th:aria-label="#{form.doctor}">
+            <a th:each="d : ${doctors}" th:href="@{/week(doctorId=${d.id}, start=${monday})}"
+               th:classappend="${doctor != null and d.id == doctor.id} ? 'active'">
+                <span class="avatar sm" th:style="'--hue:' + ${@avatars.hue(d.displayName)}" th:text="${@avatars.initials(d.displayName)}">DK</span>
+                <span th:text="${d.displayName}">Dr. Khoury</span></a>
         </nav>
-    </div>
-    <p class="muted" th:if="${doctors.isEmpty()}" th:text="#{week.no-doctors}">No active doctors.</p>
-    <nav class="tabs" th:unless="${doctors.isEmpty()}">
-        <a th:each="d : ${doctors}" th:href="@{/week(doctorId=${d.id}, start=${monday})}" th:text="${d.displayName}"
-           th:classappend="${doctor != null and d.id == doctor.id} ? 'active'">Dr. Khoury</a>
-    </nav>
-    <div class="week" th:unless="${doctors.isEmpty()}">
-        <section class="day card" th:each="c : ${columns}" th:classappend="${c.today()} ? 'today'">
-            <h2 th:text="${c.label()}">Mon 2 Nov</h2>
-            <p class="muted" th:if="${c.closed()}" th:text="#{week.closed}">Closed</p>
-            <ul class="cells">
-                <li th:each="cell : ${c.cells()}" th:class="'cell ' + ${cell.kind()}">
-                    <span class="time" th:text="${cell.time()}">9:00 AM</span>
-                    <th:block th:switch="${cell.kind()}">
-                        <span th:case="'booked'">
-                            <span th:text="${cell.patientName()} ?: #{patient.deleted}">Rana</span>
-                            <span class="chip" th:classappend="'chip-' + ${cell.status()}" th:text="#{'status.' + ${cell.status()}}">Booked</span>
-                        </span>
-                        <a th:case="'free'" th:href="@{/appointments/new(doctorId=${doctor.id}, date=${cell.bookDate()}, time=${cell.bookTime()})}"
-                           th:text="#{week.free}">Free</a>
-                        <span th:case="*" class="muted" th:text="#{week.free}">Free</span>
-                    </th:block>
-                </li>
-            </ul>
-        </section>
-    </div>
+
+        <div class="legend" aria-hidden="true">
+            <span class="lg-BOOKED"><i></i><th:block th:text="#{status.BOOKED}">Booked</th:block></span>
+            <span class="lg-CONFIRMED"><i></i><th:block th:text="#{status.CONFIRMED}">Confirmed</th:block></span>
+            <span class="lg-ARRIVED"><i></i><th:block th:text="#{status.ARRIVED}">Arrived</th:block></span>
+            <span class="lg-NO_SHOW"><i></i><th:block th:text="#{status.NO_SHOW}">No-show</th:block></span>
+            <span class="lg-free"><i></i><th:block th:text="#{week.free}">Free</th:block></span>
+        </div>
+
+        <p class="drag-hint"><svg class="icon" aria-hidden="true"><use href="#i-move"/></svg>
+            <span class="for-mouse" th:text="#{week.drag-hint}">Click an appointment for its details, or drag it onto a free time.</span>
+            <span class="for-touch" th:text="#{week.drag-hint.touch}">Tap an appointment for its details, or press and hold it, then drag.</span></p>
+
+        <!--/*
+          Phones show the days one under another; this strip (phones only) stays at the top and jumps to a
+          day. While dragging, holding an appointment over a day here scrolls to that day (app.js).
+        */-->
+        <nav class="day-strip" th:aria-label="#{week.days}" th:unless="${columns.isEmpty()}">
+            <a th:each="c : ${columns}" th:href="'#day-' + ${c.date()}" data-jump-day th:attr="data-day=${c.date()}"
+               th:classappend="${c.today()} ? 'today' : (${c.past()} ? 'past')"
+               th:title="${c.label()}">
+                <span class="ds-name" th:text="${c.weekday()}">Mon</span>
+                <span class="ds-num" th:text="${c.dayOfMonth()}">12</span>
+                <span class="ds-mark" aria-hidden="true" th:classappend="${c.closed()} ? 'closed' : (${c.booked() > 0} ? 'booked')"></span>
+                <span class="sr-only" th:if="${c.closed()}" th:text="#{week.closed}">Closed</span>
+            </a>
+        </nav>
+
+        <div class="week-board" th:attr="data-focus-day=${focusDay}">
+            <section class="day-col" th:each="c : ${columns}" th:id="'day-' + ${c.date()}" th:classappend="${c.today()} ? 'today'">
+                <header class="day-head">
+                    <strong th:text="${c.label()}">Mon 2 Nov</strong>
+                    <span class="count" th:if="${c.booked() > 0}" th:text="${c.booked()}">3</span>
+                </header>
+                <div class="day-closed" th:if="${c.closed()}" th:text="#{week.closed}">Closed</div>
+                <!--/* A closed day that is still to come can be opened for that date only. */-->
+                <details class="open-day" th:if="${c.closed() and !c.past()}">
+                    <summary class="button sm"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                        <span th:text="#{week.open-day}">Open this day</span></summary>
+                    <form method="post" th:action="@{/week/open-day}">
+                        <input type="hidden" name="doctorId" th:value="${doctor.id}">
+                        <input type="hidden" name="date" th:value="${c.date()}">
+                        <label><span th:text="#{settings.from}">From</span><input type="time" name="start" th:value="${openStart}" required></label>
+                        <label><span th:text="#{settings.to}">To</span><input type="time" name="end" th:value="${openEnd}" required></label>
+                        <button type="submit" class="primary sm" th:text="#{week.open}">Open</button>
+                    </form>
+                </details>
+                <ul class="day-cells" th:unless="${c.closed()}">
+                    <li th:each="cell : ${c.cells()}" th:switch="${cell.kind()}">
+                        <!--/*
+                          Tap or click: details in the slide-over. Open future ones can also be dragged onto a free
+                          time (app.js, pointer events; draggable="false" keeps the browser's own link drag out of it).
+                        */-->
+                        <a th:case="'booked'" class="block booked" th:classappend="'s-' + ${cell.status()}" data-drawer
+                           th:href="@{/appointments/{id}(id=${cell.appointmentId()}, returnTo='week')}"
+                           th:title="#{'status.' + ${cell.status()}}"
+                           draggable="false"
+                           th:attr="data-move-id=${cell.movable()} ? ${cell.appointmentId()} : null,
+                                    data-move-who=${cell.movable()} ? (${cell.patientName()} ?: #{patient.deleted}) : null">
+                            <span class="time" th:text="${cell.time()}">9:00 AM</span>
+                            <span class="who" th:text="${cell.patientName()} ?: #{patient.deleted}">Rana</span>
+                            <span class="sr-only" th:text="#{'status.' + ${cell.status()}}">Booked</span>
+                        </a>
+                        <a th:case="'free'" class="block free" data-drawer draggable="false"
+                           th:href="@{/appointments/new(doctorId=${doctor.id}, date=${cell.bookDate()}, time=${cell.bookTime()}, returnTo='week')}"
+                           th:title="#{week.book-this}"
+                           th:attr="data-drop-date=${cell.bookDate()}, data-drop-time=${cell.bookTime()},
+                                    data-drop-label=${c.label()} + ' ' + ${cell.time()}">
+                            <span class="time" th:text="${cell.time()}">9:30 AM</span>
+                            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                            <span class="sr-only" th:text="#{week.free}">Free</span>
+                        </a>
+                        <div th:case="*" class="block past"><span class="time" th:text="${cell.time()}">8:30 AM</span>
+                            <span th:text="#{week.free}">Free</span></div>
+                    </li>
+                </ul>
+            </section>
+        </div>
+
+        <!--/* Filled in and submitted by app.js when an appointment is dropped on a free time. */-->
+        <form id="move-form" method="post" th:action="@{/week/move}" hidden th:attr="data-question=#{week.move-confirm}">
+            <input type="hidden" name="appointmentId">
+            <input type="hidden" name="date">
+            <input type="hidden" name="time">
+        </form>
+    </th:block>
 </main>
 </body>
 </html>

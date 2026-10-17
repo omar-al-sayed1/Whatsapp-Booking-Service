@@ -19,6 +19,11 @@ spring:
   messages:
     basename: messages
     fallback-to-system-locale: false
+  # Render each page fully before sending it. Streamed output commits the response early on big
+  # pages, and a login page without a session then can't create one for its CSRF token.
+  thymeleaf:
+    servlet:
+      produce-partial-output-while-processing: false
   # Dates and times in URLs and forms are ISO (2026-10-21, 09:30), never locale-styled.
   mvc:
     format:

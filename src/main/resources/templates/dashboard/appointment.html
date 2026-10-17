@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, ${returnTo == 'week'} ? 'week' : 'today', ~{::main})}">
+<head><title th:text="${details.patientName()} ?: #{appointment.title}">Appointment</title></head>
+<body>
+<main class="container narrow">
+    <!--/* .drawer-content is what the slide-over shows when an appointment is clicked on Week. */-->
+    <div class="drawer-content">
+        <a class="back-link" data-drawer-close
+           th:href="${returnTo == 'week'} ? @{/week(doctorId=${doctorId}, start=${date})} : @{/(date=${date})}">
+            <svg class="icon flip-rtl" aria-hidden="true"><use href="#i-chevron-left"/></svg><span th:text="#{action.back}">Back</span></a>
+
+        <header class="page-head">
+            <div class="appt-who">
+                <span class="avatar lg" th:style="'--hue:' + ${@avatars.hue(details.patientName())}"
+                      th:text="${@avatars.initials(details.patientName())}">RH</span>
+                <div>
+                    <div class="eyebrow"><span th:text="#{appointment.title}">Appointment</span></div>
+                    <h1 th:text="${details.patientName()} ?: #{patient.deleted}">Rana Haddad</h1>
+                </div>
+            </div>
+            <span class="chip" th:classappend="${details.cancelledByPatient()} ? 'chip-patient-cancelled' : 'chip-' + ${details.status()}"
+                  th:text="${details.cancelledByPatient()} ? #{status.cancelled-by-patient} : #{'status.' + ${details.status()}}">Booked</span>
+        </header>
+
+        <section class="card">
+            <dl class="facts">
+                <div><dt th:text="#{form.date}">Date</dt><dd th:text="${details.date()}">Wednesday 21 October 2026</dd></div>
+                <div><dt th:text="#{appointment.time}">Time</dt><dd dir="auto" th:text="${details.hours()}">10:20 AM – 10:40 AM</dd></div>
+                <div><dt th:text="#{form.doctor}">Doctor</dt><dd th:text="${details.doctor()}">Dr. Khoury</dd></div>
+                <div th:if="${details.phone()}"><dt th:text="#{form.phone}">Phone</dt>
+                    <dd><a class="phone" th:href="'tel:' + ${details.phone()}" dir="ltr">
+                        <svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg><span th:text="${details.phone()}">+96170123456</span></a></dd></div>
+                <div th:if="${details.language()}"><dt th:text="#{form.language}">Messages in</dt>
+                    <dd th:text="#{'language.' + ${details.language()}}">Arabic</dd></div>
+                <div><dt th:text="#{appointment.source}">Booked</dt>
+                    <dd><span class="source" th:classappend="${details.source() == 'WHATSAPP'} ? 'whatsapp'">
+                        <svg class="icon" aria-hidden="true"><use th:href="${details.source() == 'WHATSAPP'} ? '#i-chat' : '#i-pencil'"/></svg>
+                        <span th:text="#{'source.' + ${details.source()}}">WhatsApp</span></span></dd></div>
+            </dl>
+        </section>
+
+        <div class="form-actions" th:if="${details.movable()}">
+            <a class="button primary" data-drawer
+               th:href="@{/appointments/{id}/reschedule(id=${details.id()}, returnTo=${returnTo})}">
+                <svg class="icon" aria-hidden="true"><use href="#i-move"/></svg><span th:text="#{action.reschedule}">Move</span></a>
+            <form method="post" th:action="@{/appointments/{id}/cancel(id=${details.id()})}" th:data-confirm="#{action.cancel-confirm}">
+                <input type="hidden" name="returnTo" th:value="${returnTo}">
+                <button type="submit" class="danger"><svg class="icon" aria-hidden="true"><use href="#i-ban"/></svg>
+                    <span th:text="#{appointment.cancel}">Cancel appointment</span></button>
+            </form>
+        </div>
+        <p class="muted" th:unless="${details.movable()}" th:text="#{appointment.locked}">This appointment can no longer be changed.</p>
+    </div>
+</main>
+</body>
+</html>

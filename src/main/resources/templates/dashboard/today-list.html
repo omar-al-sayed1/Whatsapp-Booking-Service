@@ -1,48 +1,125 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--/* The day's list. Reloads itself every 30 s; actions post with htmx and get this fragment back. */-->
+<!--/*
+  The day's figures and appointments per doctor. Reloads itself every 30 s; actions post with htmx
+  and get this fragment back (with a view transition, so the change is animated where supported).
+*/-->
 <section id="today-list" th:fragment="list" th:hx-get="@{/today/list(date=${date})}" hx-trigger="every 30s"
          hx-swap="outerHTML">
-    <p class="muted" th:if="${doctors.isEmpty()}" th:text="#{today.no-doctors}">No doctors yet.</p>
-    <div class="doctor card" th:each="d : ${doctors}">
-        <h2 th:text="${d.name()}">Dr. Khoury</h2>
-        <p class="muted" th:if="${d.rows().isEmpty()}" th:text="#{today.empty}">No appointments.</p>
-        <table class="appointments" th:unless="${d.rows().isEmpty()}">
-            <tbody>
-            <tr th:each="r : ${d.rows()}" th:classappend="${r.cancelled()} ? 'cancelled'"
-                th:attr="data-appointment=${r.id()}">
-                <td class="time" th:text="${r.time()}">10:30 AM</td>
-                <td class="patient">
-                    <strong th:text="${r.patientName()} ?: #{patient.deleted}">Rana</strong>
-                    <a class="muted phone" th:if="${r.patientPhone()}" th:href="'tel:' + ${r.patientPhone()}"
-                       th:text="${r.patientPhone()}" dir="ltr">+96170123456</a>
-                </td>
-                <td class="status">
-                    <span class="chip" th:classappend="${r.cancelledByPatient()} ? 'chip-patient-cancelled' : 'chip-' + ${r.status()}"
-                          th:text="${r.cancelledByPatient()} ? #{status.cancelled-by-patient} : #{'status.' + ${r.status()}}">Booked</span>
-                    <span class="muted small" th:text="#{'source.' + ${r.source()}}">WhatsApp</span>
-                </td>
-                <td class="actions">
-                    <form th:if="${r.canArrive()}" method="post" th:action="@{/appointments/{id}/arrived(id=${r.id()})}"
-                          th:hx-post="@{/appointments/{id}/arrived(id=${r.id()})}" hx-target="#today-list" hx-swap="outerHTML">
-                        <button type="submit" th:text="#{action.arrived}">Arrived</button>
-                    </form>
-                    <form th:if="${r.canNoShow()}" method="post" th:action="@{/appointments/{id}/no-show(id=${r.id()})}"
-                          th:hx-post="@{/appointments/{id}/no-show(id=${r.id()})}" hx-target="#today-list" hx-swap="outerHTML">
-                        <button type="submit" th:text="#{action.no-show}">No-show</button>
-                    </form>
-                    <a th:if="${r.canReschedule()}" class="button"
-                       th:href="@{/appointments/{id}/reschedule(id=${r.id()})}" th:text="#{action.reschedule}">Move</a>
-                    <form th:if="${r.canCancel()}" method="post" th:action="@{/appointments/{id}/cancel(id=${r.id()})}"
-                          th:hx-post="@{/appointments/{id}/cancel(id=${r.id()})}" hx-target="#today-list" hx-swap="outerHTML"
-                          th:hx-confirm="#{action.cancel-confirm}">
-                        <button type="submit" class="danger" th:text="#{action.cancel}">Cancel</button>
-                    </form>
-                </td>
-            </tr>
-            </tbody>
-        </table>
+
+    <div class="stats">
+        <div class="stat">
+            <div class="stat-head"><span class="stat-label" th:text="#{today.stats.total}">Appointments</span>
+                <span class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-today"/></svg></span></div>
+            <div class="stat-value" th:text="${stats.total()}">12</div>
+            <div class="stat-sub" th:text="#{today.stats.whatsapp(${stats.whatsApp() + ''})}">4 booked on WhatsApp</div>
+        </div>
+        <div class="stat tone-ok">
+            <div class="stat-head"><span class="stat-label" th:text="#{today.stats.confirmed}">Confirmed</span>
+                <span class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-check-circle"/></svg></span></div>
+            <div class="stat-value" th:text="${stats.confirmed()}">7</div>
+            <div class="meter" role="presentation"><span th:style="'width:' + ${stats.confirmedPercent()} + '%'"></span></div>
+            <div class="stat-sub" th:text="#{today.stats.confirmed-share(${stats.confirmedPercent() + ''})}">70% of open ones</div>
+        </div>
+        <div class="stat tone-arrived">
+            <div class="stat-head"><span class="stat-label" th:text="#{today.stats.arrived}">Arrived</span>
+                <span class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-user-check"/></svg></span></div>
+            <div class="stat-value" th:text="${stats.arrived()}">3</div>
+            <div class="stat-sub"></div>
+        </div>
+        <div class="stat tone-warn">
+            <div class="stat-head"><span class="stat-label" th:text="#{today.stats.no-show}">No-shows</span>
+                <span class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-user-x"/></svg></span></div>
+            <div class="stat-value" th:text="${stats.noShows()}">1</div>
+            <div class="stat-sub"></div>
+        </div>
+        <div class="stat tone-danger">
+            <div class="stat-head"><span class="stat-label" th:text="#{today.stats.cancelled}">Cancelled</span>
+                <span class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-ban"/></svg></span></div>
+            <div class="stat-value" th:text="${stats.cancelled()}">2</div>
+            <div class="stat-sub" th:text="#{today.stats.cancelled-by-patient(${stats.cancelledByPatient() + ''})}">1 by the patient</div>
+        </div>
+    </div>
+
+    <div class="card empty" th:if="${doctors.isEmpty()}">
+        <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg></span>
+        <strong th:text="#{today.no-doctors}">No doctors yet.</strong>
+        <a class="button primary sm" th:href="@{/settings}"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg>
+            <span th:text="#{nav.settings}">Settings</span></a>
+    </div>
+
+    <div class="doctors">
+        <article class="doctor-panel" th:each="d : ${doctors}">
+            <header class="doctor-head">
+                <span class="avatar lg" th:style="'--hue:' + ${@avatars.hue(d.name())}" th:text="${@avatars.initials(d.name())}">DK</span>
+                <div>
+                    <h2 th:text="${d.name()}">Dr. Khoury</h2>
+                    <span class="muted" th:text="#{today.doctor.count(${d.active() + ''})}">8 appointments</span>
+                </div>
+                <a class="button ghost icon-btn sm" data-drawer th:href="@{/appointments/new(date=${date},doctorId=${d.id()})}"
+                   th:title="#{today.add}" th:aria-label="#{today.add}">
+                    <svg class="icon" aria-hidden="true"><use href="#i-calendar-plus"/></svg></a>
+            </header>
+
+            <div class="empty" th:if="${d.rows().isEmpty()}">
+                <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg></span>
+                <strong th:text="#{today.empty}">No appointments.</strong>
+                <p th:text="#{today.empty.hint}">Free times stay open for booking on WhatsApp.</p>
+            </div>
+
+            <ol class="timeline" th:unless="${d.rows().isEmpty()}">
+                <th:block th:each="r, it : ${d.rows()}">
+                    <li class="now-line" th:if="${it.index == d.nowIndex()}">
+                        <span th:text="#{today.now(${nowTime})}">Now 12:04</span></li>
+                    <li class="appt" th:classappend="${'s-' + r.status()} + ${r.cancelledByPatient() ? ' by-patient' : ''} + ${r.past() ? ' is-past' : ''}"
+                        th:attr="data-appointment=${r.id()}">
+                        <div class="appt-time">
+                            <strong th:text="${r.time()}">10:30 AM</strong>
+                            <span class="source" th:classappend="${r.source() == 'WHATSAPP'} ? 'whatsapp'">
+                                <svg class="icon" aria-hidden="true"><use th:href="${r.source() == 'WHATSAPP'} ? '#i-chat' : '#i-pencil'"/></svg>
+                                <span th:text="#{'source.' + ${r.source()}}">WhatsApp</span></span>
+                        </div>
+                        <div class="appt-who">
+                            <span class="avatar sm" th:style="'--hue:' + ${@avatars.hue(r.patientName())}"
+                                  th:text="${@avatars.initials(r.patientName())}">RH</span>
+                            <div class="appt-name">
+                                <strong th:text="${r.patientName()} ?: #{patient.deleted}">Rana</strong>
+                                <a class="phone" th:if="${r.patientPhone()}" th:href="'tel:' + ${r.patientPhone()}" dir="ltr">
+                                    <svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg><span th:text="${r.patientPhone()}">+96170123456</span></a>
+                            </div>
+                        </div>
+                        <div class="appt-side">
+                            <span class="chip" th:classappend="${r.cancelledByPatient()} ? 'chip-patient-cancelled' : 'chip-' + ${r.status()}"
+                                  th:text="${r.cancelledByPatient()} ? #{status.cancelled-by-patient} : #{'status.' + ${r.status()}}">Booked</span>
+                            <div class="appt-actions">
+                                <form th:if="${r.canArrive()}" method="post" th:action="@{/appointments/{id}/arrived(id=${r.id()})}"
+                                      th:hx-post="@{/appointments/{id}/arrived(id=${r.id()})}" hx-target="#today-list" hx-swap="outerHTML transition:true">
+                                    <button type="submit" class="sm"><svg class="icon" aria-hidden="true"><use href="#i-user-check"/></svg>
+                                        <span th:text="#{action.arrived}">Arrived</span></button>
+                                </form>
+                                <form th:if="${r.canNoShow()}" method="post" th:action="@{/appointments/{id}/no-show(id=${r.id()})}"
+                                      th:hx-post="@{/appointments/{id}/no-show(id=${r.id()})}" hx-target="#today-list" hx-swap="outerHTML transition:true">
+                                    <button type="submit" class="sm"><svg class="icon" aria-hidden="true"><use href="#i-user-x"/></svg>
+                                        <span th:text="#{action.no-show}">No-show</span></button>
+                                </form>
+                                <a th:if="${r.canReschedule()}" class="button sm ghost" data-drawer
+                                   th:href="@{/appointments/{id}/reschedule(id=${r.id()})}">
+                                    <svg class="icon" aria-hidden="true"><use href="#i-move"/></svg><span th:text="#{action.reschedule}">Move</span></a>
+                                <form th:if="${r.canCancel()}" method="post" th:action="@{/appointments/{id}/cancel(id=${r.id()})}"
+                                      th:hx-post="@{/appointments/{id}/cancel(id=${r.id()})}" hx-target="#today-list" hx-swap="outerHTML transition:true"
+                                      th:hx-confirm="#{action.cancel-confirm}">
+                                    <button type="submit" class="sm danger icon-btn" th:title="#{action.cancel}" th:aria-label="#{action.cancel}">
+                                        <svg class="icon" aria-hidden="true"><use href="#i-ban"/></svg></button>
+                                </form>
+                            </div>
+                        </div>
+                    </li>
+                </th:block>
+                <li class="now-line" th:if="${d.nowIndex() == d.rows().size()}">
+                    <span th:text="#{today.now(${nowTime})}">Now 12:04</span></li>
+            </ol>
+        </article>
     </div>
 </section>
 <!--/* Returned with HX-Refresh when an action no longer applies: htmx reloads the page. */-->

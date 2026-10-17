@@ -17,6 +17,8 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
+import org.springframework.security.web.savedrequest.RequestCache;
 
 /**
  * Form login for the dashboard. Clinic staff (OWNER, SECRETARY) get the dashboard; operators get
@@ -30,7 +32,7 @@ class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login", "/css/**", "/webjars/**", "/favicon.ico", "/error").permitAll()
+                        .requestMatchers("/login", "/css/**", "/js/**", "/fonts/**", "/webjars/**", "/favicon.ico", "/error").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/webhooks/whatsapp").permitAll()
                         .requestMatchers("/dev/whatsapp", "/dev/whatsapp/**").permitAll()
@@ -42,9 +44,31 @@ class SecurityConfig {
                         .successHandler(new LanguageRememberingSuccessHandler())
                         .permitAll())
                 .logout(logout -> logout.logoutSuccessUrl("/login?logout"))
+                .requestCache(cache -> cache.requestCache(pagesOnlyRequestCache()))
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/webhooks/whatsapp", "/dev/whatsapp/**"))
                 .exceptionHandling(errors -> errors.authenticationEntryPoint(new HtmxAwareEntryPoint()));
         return http.build();
+    }
+
+    /**
+     * Only whole pages are remembered as the place to return to after logging in. Otherwise the
+     * 30-second refresh of an open Today page, after the session expired, would send the user to a
+     * bare htmx fragment once they log in again, and what the browser fetches on its own (icons,
+     * Chrome DevTools' {@code /.well-known/appspecific/com.chrome.devtools.json}) to a 404.
+     */
+    private static RequestCache pagesOnlyRequestCache() {
+        HttpSessionRequestCache cache = new HttpSessionRequestCache();
+        cache.setRequestMatcher(SecurityConfig::isPageRequest);
+        return cache;
+    }
+
+    /** A page the user opened: the browser asks for HTML, and it isn't htmx or a {@code /.well-known/} probe. */
+    static boolean isPageRequest(HttpServletRequest request) {
+        String accept = request.getHeader("Accept");
+        return "GET".equals(request.getMethod())
+                && !"true".equals(request.getHeader("HX-Request"))
+                && accept != null && accept.contains("text/html")
+                && !request.getRequestURI().startsWith(request.getContextPath() + "/.well-known/");
     }
 
     @Bean

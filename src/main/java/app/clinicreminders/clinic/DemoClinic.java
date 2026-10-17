@@ -127,8 +127,8 @@ public class DemoClinic {
         }
         long clinicId = clinic.getId();
 
-        Doctor demo = doctor(clinicId, "د. ديمو", 20, EnumSet.range(DayOfWeek.MONDAY, DayOfWeek.SATURDAY), "09:00", "13:00");
-        Doctor sara = doctor(clinicId, "د. سارة نصّار", 30,
+        Doctor demo = doctor(clinic, "د. ديمو", EnumSet.range(DayOfWeek.MONDAY, DayOfWeek.SATURDAY), "09:00", "13:00");
+        Doctor sara = doctor(clinic, "د. سارة نصّار",
                 EnumSet.of(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY, DayOfWeek.FRIDAY), "16:00", "19:00");
         List<Patient> people = PATIENTS.stream()
                 .map(p -> patients.save(new Patient(clinicId, p.name(), p.phone(), p.language())))
@@ -159,8 +159,10 @@ public class DemoClinic {
         return clinics.save(clinic);
     }
 
-    private Doctor doctor(long clinicId, String name, int slotMinutes, Set<DayOfWeek> days, String start, String end) {
-        Doctor doctor = doctors.save(new Doctor(clinicId, name, slotMinutes));
+    /** Every doctor follows the clinic's appointment length. */
+    private Doctor doctor(Clinic clinic, String name, Set<DayOfWeek> days, String start, String end) {
+        long clinicId = clinic.getId();
+        Doctor doctor = doctors.save(new Doctor(clinicId, name, clinic.getSlotMinutes()));
         for (DayOfWeek day : days) {
             rules.save(new ScheduleRule(clinicId, doctor.getId(), day,
                     new TimeWindow(LocalTime.parse(start), LocalTime.parse(end))));

@@ -22,6 +22,7 @@ import app.clinicreminders.reminder.Reminder;
 import app.clinicreminders.reminder.ReminderRepository;
 import app.clinicreminders.reminder.ReminderStatus;
 import app.clinicreminders.scheduling.Doctor;
+import app.clinicreminders.scheduling.Doctor;
 import app.clinicreminders.staff.StaffPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,6 +57,21 @@ class PatientsPageIT extends DashboardTest {
         Clinic other = data.clinic("B");
         data.patient(other, "Rania Elsewhere", "+96170123457", Language.AR);
         staff = secretaryOf(clinic);
+    }
+
+    @Test
+    void eachPatientShowsWhetherTheyAreBooked() {
+        Doctor doctor = data.doctor(clinic, "Dr. Khoury", 30);
+        // Wednesday 21 October 10:30 in Beirut; a cancelled and a past one do not count.
+        data.appointment(doctor, rana, Instant.parse("2026-10-21T07:30:00Z"), Duration.ofMinutes(30));
+        data.appointment(doctor, rana, Instant.parse("2026-10-28T07:30:00Z"), Duration.ofMinutes(30));
+        data.appointment(doctor, rana, Instant.parse("2026-10-01T07:30:00Z"), Duration.ofMinutes(30));
+        Patient karim = patients.findByClinicIdAndPhoneE164(clinic.getId(), "+9613111222").orElseThrow();
+        data.cancelledAppointment(doctor, karim, Instant.parse("2026-10-22T07:30:00Z"), Duration.ofMinutes(30));
+
+        assertThat(get(staff, "/patients")).hasStatusOk().bodyText()
+                .contains("Next appointment", "Wed 21 Oct, 10:30 AM", "Dr. Khoury", "No upcoming appointment")
+                .doesNotContain("Wed 28 Oct", "Thu 22 Oct");
     }
 
     @Test

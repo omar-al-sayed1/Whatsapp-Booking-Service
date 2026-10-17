@@ -52,4 +52,9 @@ final class Formats {
     String day(DayOfWeek day) {
         return day.getDisplayName(TextStyle.FULL, locale);
     }
+
+    /** "Mon"; Arabic has no abbreviations, so the full name there. */
+    String weekdayShort(LocalDate value) {
+        return value.getDayOfWeek().getDisplayName(TextStyle.SHORT, locale);
+    }
 }

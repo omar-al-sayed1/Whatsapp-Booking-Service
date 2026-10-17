@@ -3,36 +3,48 @@
 <head><title th:text="#{operator.clinics}">Clinics</title></head>
 <body>
 <main class="container">
-    <h1 th:text="#{operator.clinics}">Clinics</h1>
+    <header class="page-head">
+        <div>
+            <div class="eyebrow"><svg class="icon" aria-hidden="true"><use href="#i-building"/></svg><span th:text="#{operator.title}">Operator</span></div>
+            <h1 th:text="#{operator.clinics}">Clinics</h1>
+        </div>
+    </header>
 
-    <p class="muted" th:if="${clinics.isEmpty()}" th:text="#{operator.clinics.none}">No clinics yet.</p>
-    <table class="list card" th:unless="${clinics.isEmpty()}">
-        <thead>
-        <tr>
-            <th th:text="#{operator.clinic.name}">Name</th>
-            <th th:text="#{operator.clinic.timezone}">Timezone</th>
-            <th th:text="#{operator.clinic.language}">Patients' language</th>
-            <th th:text="#{operator.whatsapp}">WhatsApp</th>
-            <th th:text="#{operator.logins}">Logins</th>
-            <th></th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="c : ${clinics}">
-            <td><strong th:text="${c.name()}">Dr. Demo</strong></td>
-            <td class="muted" dir="ltr" th:text="${c.timezone()}">Asia/Beirut</td>
-            <td class="muted" th:text="#{'language.' + ${c.language()}}">Arabic</td>
-            <td><span class="chip" th:classappend="${c.connected()} ? 'chip-CONFIRMED' : 'chip-CANCELLED'"
-                      th:text="${c.connected()} ? #{operator.connected.yes} : #{operator.connected.no}">Connected</span></td>
-            <td class="muted" th:text="${c.logins()}">2</td>
-            <td class="actions"><a class="button" th:href="@{/operator/clinics/{id}(id=${c.id()})}"
-                                   th:text="#{operator.clinic.open}">Open</a></td>
-        </tr>
-        </tbody>
-    </table>
+    <div class="card empty" th:if="${clinics.isEmpty()}">
+        <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-building"/></svg></span>
+        <strong th:text="#{operator.clinics.none}">No clinics yet.</strong>
+    </div>
+
+    <div class="clinic-cards" th:unless="${clinics.isEmpty()}">
+        <article class="clinic-card" th:each="c : ${clinics}">
+            <header>
+                <span class="avatar lg square-avatar" th:style="'--hue:' + ${@avatars.hue(c.name())}" th:text="${@avatars.initials(c.name())}">DD</span>
+                <div class="grow">
+                    <h2 th:text="${c.name()}">Dr. Demo</h2>
+                    <span class="chip" th:classappend="${c.connected()} ? 'chip-CONFIRMED' : 'chip-CANCELLED'"
+                          th:text="${c.connected()} ? #{operator.connected.yes} : #{operator.connected.no}">Connected</span>
+                </div>
+            </header>
+            <div class="tags">
+                <span class="tag" dir="ltr"><svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg><span th:text="${c.timezone()}">Asia/Beirut</span></span>
+                <span class="tag" th:text="#{'language.' + ${c.language()}}">Arabic</span>
+                <span class="tag"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
+                    <span th:text="#{settings.doctor.minutes(${c.slotMinutes() + ''})}">20 min</span></span>
+                <span class="tag"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg>
+                    <span th:text="#{operator.login-count(${c.logins() + ''})}">2 logins</span></span>
+            </div>
+            <div>
+                <div class="progress-label"><span th:text="#{operator.setup}">Setup</span>
+                    <span th:text="#{operator.ready(${c.ready() + ''}, ${steps + ''})}">4 of 5</span></div>
+                <div class="progress"><span th:style="'width:' + ${c.readyPercent()} + '%'"></span></div>
+            </div>
+            <a class="button" th:href="@{/operator/clinics/{id}(id=${c.id()})}">
+                <span th:text="#{operator.clinic.open}">Open</span><svg class="icon flip-rtl" aria-hidden="true"><use href="#i-chevron-right"/></svg></a>
+        </article>
+    </div>
 
     <section class="card">
-        <h2 th:text="#{operator.clinic.add}">Add a clinic</h2>
+        <div class="section-head"><h2 th:text="#{operator.clinic.add}">Add a clinic</h2></div>
         <form method="post" th:action="@{/operator/clinics}" class="row">
             <label><span th:text="#{operator.clinic.name}">Name</span>
                 <input type="text" name="name" maxlength="100" required></label>
@@ -44,7 +56,10 @@
                     <option value="en" th:text="#{language.en}">English</option>
                 </select>
             </label>
-            <button type="submit" class="primary" th:text="#{action.add}">Add</button>
+            <label><span th:text="#{operator.clinic.slot}">Appointment length (minutes)</span>
+                <input type="number" name="slotMinutes" value="20" min="5" max="240" step="5" required></label>
+            <button type="submit" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                <span th:text="#{action.add}">Add</span></button>
         </form>
     </section>
 </main>

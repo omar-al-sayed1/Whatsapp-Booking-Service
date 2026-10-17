@@ -27,4 +27,16 @@ class ClinicTest {
                 .isThrownBy(() -> clinic.changeContactDetails("Zahle", "x".repeat(Clinic.CONTACT_TEXT_MAX + 1)));
         assertThat(clinic.getAddress()).as("unchanged").hasSize(Clinic.CONTACT_TEXT_MAX);
     }
+
+    @Test
+    void appointmentsAreTwentyMinutesUnlessTheOperatorChangesIt() {
+        assertThat(clinic.getSlotMinutes()).isEqualTo(20);
+
+        clinic.changeSlotMinutes(30);
+        assertThat(clinic.getSlotMinutes()).isEqualTo(30);
+
+        assertThatIllegalArgumentException().isThrownBy(() -> clinic.changeSlotMinutes(4));
+        assertThatIllegalArgumentException().isThrownBy(() -> clinic.changeSlotMinutes(241));
+        assertThat(clinic.getSlotMinutes()).isEqualTo(30);
+    }
 }

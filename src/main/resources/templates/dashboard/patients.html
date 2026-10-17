@@ -3,28 +3,82 @@
 <head><title th:text="#{patients.title}">Patients</title></head>
 <body>
 <main class="container">
-    <h1 th:text="#{patients.title}">Patients</h1>
-    <form method="get" th:action="@{/patients}" class="search">
-        <input type="search" name="q" th:value="${q}" th:placeholder="#{patients.search}" th:aria-label="#{patients.search}">
-        <button type="submit" th:text="#{action.search}">Search</button>
+    <header class="page-head">
+        <div>
+            <div class="eyebrow"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg><span th:text="#{patients.title}">Patients</span></div>
+            <h1 th:text="#{patients.title}">Patients</h1>
+        </div>
+    </header>
+
+    <!--/* Results update as you type; the plain GET still works without JS. */-->
+    <form method="get" th:action="@{/patients}" class="big-search" role="search">
+        <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+        <input type="search" name="q" th:value="${q}" th:placeholder="#{patients.search}" th:aria-label="#{patients.search}"
+               autocomplete="off" data-key="slash" dir="auto"
+               th:hx-get="@{/patients}" hx-trigger="input changed delay:250ms, search" hx-target="#patient-results"
+               hx-select="#patient-results" hx-swap="outerHTML" hx-push-url="true" hx-indicator=".big-search">
+        <span class="htmx-indicator" aria-hidden="true"></span>
+        <kbd class="kbd-hint">/</kbd>
     </form>
-    <p class="muted" th:if="${patients.isEmpty()}" th:text="#{patients.empty}">No patients found.</p>
-    <table class="list card" th:unless="${patients.isEmpty()}">
-        <tbody>
-        <tr th:each="p : ${patients}">
-            <td><strong th:text="${p.name}">Rana</strong>
-                <span class="chip chip-CANCELLED" th:if="${p.optedOut}" th:text="#{patients.opted-out}">Opted out</span></td>
-            <td><a th:href="'tel:' + ${p.phoneE164}" th:text="${p.phoneE164}" dir="ltr">+96170123456</a></td>
-            <td class="muted" th:text="#{'language.' + ${p.language.code()}}">Arabic</td>
-            <td class="actions">
-                <form method="post" th:action="@{/patients/{id}/delete(id=${p.id})}"
-                      onsubmit="return confirm(this.dataset.confirm)" th:data-confirm="#{patients.delete-confirm}">
-                    <button type="submit" class="danger" th:text="#{action.delete}">Delete</button>
-                </form>
-            </td>
-        </tr>
-        </tbody>
-    </table>
+
+    <section id="patient-results" aria-live="polite">
+        <div class="card empty" th:if="${patients.isEmpty()}">
+            <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg></span>
+            <strong th:text="#{patients.empty}">No patients found.</strong>
+            <p th:text="#{patients.hint}">Search by name or phone number.</p>
+        </div>
+
+        <th:block th:unless="${patients.isEmpty()}">
+            <p class="results-note" th:text="${patients.size() >= 50} ? #{patients.limited} : #{patients.count(${patients.size() + ''})}">12 patients</p>
+            <!--/*
+              A card per patient: who (and delete), their next appointment or none, then Call and Book.
+              Stacked rather than side by side, so nothing gets squeezed on a phone.
+            */-->
+            <ul class="people">
+                <li class="person" th:each="p : ${patients}">
+                    <div class="person-head">
+                        <span class="avatar lg" th:style="'--hue:' + ${@avatars.hue(p.name())}" th:text="${@avatars.initials(p.name())}">RH</span>
+                        <div class="person-main">
+                            <strong th:text="${p.name()}">Rana</strong>
+                            <div class="person-meta">
+                                <span dir="ltr" th:text="${p.phoneE164()}">+96170123456</span>
+                                <span class="tag" th:text="#{'language.' + ${p.language()}}">Arabic</span>
+                            </div>
+                        </div>
+                        <form method="post" th:action="@{/patients/{id}/delete(id=${p.id()})}" th:data-confirm="#{patients.delete-confirm}">
+                            <button type="submit" class="icon-btn ghost-danger" th:title="#{action.delete}" th:aria-label="#{action.delete}">
+                                <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button>
+                        </form>
+                    </div>
+                    <p class="opted-out-note" th:if="${p.optedOut()}">
+                        <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg><span th:text="#{patients.opted-out}">Opted out (no messages)</span></p>
+
+                    <!--/* Booked or not: the next appointment opens in the slide-over. */-->
+                    <a class="next-appt booked" th:if="${p.next()}" data-drawer th:href="@{/appointments/{id}(id=${p.nextId()})}">
+                        <span class="next-icon"><svg class="icon" aria-hidden="true"><use href="#i-today"/></svg></span>
+                        <span class="next-text">
+                            <span class="next-label" th:text="#{patients.next}">Next appointment</span>
+                            <strong th:text="${p.next()}">Wed 21 Oct, 10:20 AM</strong>
+                            <span class="next-doctor" th:text="${p.nextDoctor()}">Dr. Demo</span>
+                        </span>
+                        <svg class="icon flip-rtl next-go" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+                    </a>
+                    <div class="next-appt none" th:unless="${p.next()}">
+                        <span class="next-icon"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg></span>
+                        <span class="next-text"><span th:text="#{patients.not-booked}">No upcoming appointment</span></span>
+                    </div>
+
+                    <div class="person-actions">
+                        <a class="button sm" th:href="'tel:' + ${p.phoneE164()}">
+                            <svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg><span th:text="#{attention.call}">Call</span></a>
+                        <a class="button sm" th:classappend="${p.next() == null} ? 'primary'" data-drawer
+                           th:href="@{/appointments/new(phone=${p.phoneE164()}, name=${p.name()})}">
+                            <svg class="icon" aria-hidden="true"><use href="#i-calendar-plus"/></svg><span th:text="#{patients.book}">Book</span></a>
+                    </div>
+                </li>
+            </ul>
+        </th:block>
+    </section>
 </main>
 </body>
 </html>

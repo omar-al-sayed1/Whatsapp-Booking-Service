@@ -47,6 +47,17 @@ class DashboardPagesIT extends DashboardTest {
 
     @ParameterizedTest
     @EnumSource(Language.class)
+    void theSidebarCanBeCollapsed(Language language) {
+        StaffPrincipal staff = staffOf(clinic, StaffRole.OWNER, language);
+
+        assertThat(get(staff, "/")).bodyText()
+                .contains("data-sidebar-toggle", "aria-controls=\"sidebar\"", "aria-keyshortcuts=\"[\"")
+                .contains(language == Language.AR ? "طيّ القائمة" : "Collapse the menu",
+                        language == Language.AR ? "توسيع القائمة" : "Expand the menu");
+    }
+
+    @ParameterizedTest
+    @EnumSource(Language.class)
     void theLoginPageRendersWithoutAUser(Language language) {
         assertThat(mvc.get().uri("/login").header("Accept-Language", language.code()))
                 .hasStatusOk()

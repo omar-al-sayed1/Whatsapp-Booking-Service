@@ -42,14 +42,26 @@ public class PatientService {
     @Transactional(readOnly = true)
     public List<Patient> search(long clinicId, String query) {
         String name = query.strip();
-        String digits = name.replaceAll("\\D", "");
+        return patients.search(clinicId, name, searchDigits(name));
+    }
+
+    /**
+     * For the booking form's patient picker: patients booked at least once, latest first, matched
+     * like {@link #search}. An empty query gives the most recently booked.
+     */
+    @Transactional(readOnly = true)
+    public List<BookedPatient> searchBooked(long clinicId, String query) {
+        String name = query.strip();
+        return patients.searchBooked(clinicId, name, searchDigits(name));
+    }
+
+    /** The digits typed, without a leading 0 (03 123 456 is stored as +9613123456); none if fewer than 3. */
+    private static String searchDigits(String query) {
+        String digits = query.replaceAll("\\D", "");
         if (digits.startsWith("0")) {
             digits = digits.substring(1);
         }
-        if (digits.length() < 3) {
-            digits = "";
-        }
-        return patients.search(clinicId, name, digits);
+        return digits.length() < 3 ? "" : digits;
     }
 
     /**

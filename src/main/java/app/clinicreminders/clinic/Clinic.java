@@ -21,6 +21,9 @@ public class Clinic {
 
     public static final ZoneId DEFAULT_ZONE = ZoneId.of("Asia/Beirut");
 
+    /** Every doctor's appointment length unless the operator changes it. */
+    public static final int DEFAULT_SLOT_MINUTES = 20;
+
     /** Address and hours each; keeps the Info reply well inside WhatsApp's 4096-character text limit. */
     public static final int CONTACT_TEXT_MAX = 500;
 
@@ -55,6 +58,10 @@ public class Clinic {
 
     @Column(name = "quiet_hours_end")
     private LocalTime quietHoursEnd = LocalTime.of(8, 0);
+
+    /** The length of every appointment slot, for all the clinic's doctors. Set by the operator. */
+    @Column(name = "slot_minutes")
+    private int slotMinutes = DEFAULT_SLOT_MINUTES;
 
     @Column(name = "reminder_h24_enabled")
     private boolean reminderH24Enabled = true;
@@ -140,6 +147,22 @@ public class Clinic {
     /** The language new patients get until they choose. */
     public void changeDefaultLanguage(Language language) {
         this.defaultLanguage = language;
+    }
+
+    /**
+     * The operator's setting; {@code ScheduleSettings} applies it to every doctor of the clinic.
+     *
+     * @throws IllegalArgumentException outside 5 to 240 minutes
+     */
+    public void changeSlotMinutes(int minutes) {
+        if (minutes < 5 || minutes > 240) {
+            throw new IllegalArgumentException("Slot length must be 5-240 minutes");
+        }
+        this.slotMinutes = minutes;
+    }
+
+    public int getSlotMinutes() {
+        return slotMinutes;
     }
 
     public Long getId() {

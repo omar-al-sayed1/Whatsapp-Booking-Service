@@ -9,6 +9,8 @@ import java.util.List;
 import app.clinicreminders.clinic.Clinic;
 import app.clinicreminders.clinic.ClinicRepository;
 import app.clinicreminders.common.Language;
+import app.clinicreminders.scheduling.Doctor;
+import app.clinicreminders.scheduling.DoctorRepository;
 import app.clinicreminders.staff.StaffAccounts.NewPassword;
 import app.clinicreminders.staff.StaffPrincipal;
 import app.clinicreminders.staff.StaffRole;
@@ -32,6 +34,9 @@ class OperatorPagesIT extends DashboardTest {
 
     @Autowired
     StaffUserRepository users;
+
+    @Autowired
+    DoctorRepository doctors;
 
     @Autowired
     TokenCipher tokenCipher;
@@ -89,6 +94,34 @@ class OperatorPagesIT extends DashboardTest {
         assertThat(edited.getName()).isEqualTo("Clinique Chtaura");
         assertThat(edited.getTimezone()).isEqualTo(ZoneId.of("Europe/Paris"));
         assertThat(edited.getDefaultLanguage()).isEqualTo(Language.EN);
+    }
+
+    @Test
+    void theAppointmentLengthIsTheOperatorsAndAppliesToEveryDoctor() {
+        assertThat(clinic.getSlotMinutes()).as("default").isEqualTo(20);
+        Doctor khoury = data.doctor(clinic, "Dr. Khoury", 20);
+        Doctor saab = data.doctor(clinic, "Dr. Saab", 20);
+
+        post(operator, "/operator/clinics/{id}", clinic.getId()).param("name", "Clinique Zahle")
+                .param("timezone", "Asia/Beirut").param("defaultLanguage", "ar").param("slotMinutes", "30").exchange();
+
+        assertThat(clinics.findById(clinic.getId()).orElseThrow().getSlotMinutes()).isEqualTo(30);
+        assertThat(doctors.findByIdAndClinicId(khoury.getId(), clinic.getId()).orElseThrow().getSlotMinutes()).isEqualTo(30);
+        assertThat(doctors.findByIdAndClinicId(saab.getId(), clinic.getId()).orElseThrow().getSlotMinutes()).isEqualTo(30);
+
+        assertThat(post(operator, "/operator/clinics/{id}", clinic.getId()).param("name", "Clinique Zahle")
+                .param("timezone", "Asia/Beirut").param("defaultLanguage", "ar").param("slotMinutes", "2"))
+                .flash().containsEntry("error", "error.slot-length");
+        assertThat(clinics.findById(clinic.getId()).orElseThrow().getSlotMinutes()).isEqualTo(30);
+    }
+
+    @Test
+    void aNewClinicCanStartWithItsOwnLength() {
+        post(operator, "/operator/clinics").param("name", "Dr. Saab").param("timezone", "Asia/Beirut")
+                .param("defaultLanguage", "ar").param("slotMinutes", "15").exchange();
+
+        assertThat(clinics.findAllByOrderByNameAscIdAsc()).filteredOn(c -> c.getName().equals("Dr. Saab")).singleElement()
+                .extracting(Clinic::getSlotMinutes).isEqualTo(15);
     }
 
     @Test

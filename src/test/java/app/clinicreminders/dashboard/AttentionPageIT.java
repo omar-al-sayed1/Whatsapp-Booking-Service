@@ -53,7 +53,22 @@ class AttentionPageIT extends DashboardTest {
 
         assertThat(get(staff, "/attention")).hasStatusOk().bodyText()
                 .contains("Rana", "+96170123456", "Message undeliverable (131026)", "Reminder")
+                .contains("Last 7 days", "These patients did not get the message", "class=\"error-line\"")
                 .doesNotContain("+96171000000");
+    }
+
+    /** The patient is known through the appointment (message_log keeps no phone numbers of its own). */
+    @Test
+    void aFailedReminderOffersACallToThePatient() {
+        Appointment appointment = data.appointment(data.doctor(clinic, 30), rana, Instant.parse("2026-11-03T08:30:00Z"),
+                Duration.ofMinutes(30));
+        whatsApp.failNext(WhatsAppException.fromMetaError(131026, "Message undeliverable"));
+        messenger.send(clinic.getId(), new TemplateMessage("+96170123456", "appointment_reminder", "ar", List.of()),
+                appointment.getId());
+
+        assertThat(get(staff, "/attention")).bodyText()
+                .containsOnlyOnce("href=\"tel:+96170123456\"")
+                .contains("Call");
     }
 
     @Test

@@ -5,74 +5,193 @@
 </head>
 <body>
 <main class="container narrow">
-    <h1 th:text="${form.appointmentId() == null} ? #{appointment.new.title} : #{appointment.reschedule.title}">New appointment</h1>
-    <p class="alert" role="alert" th:if="${error}" th:text="#{${error}}">Error</p>
-    <p class="muted" th:if="${form.patientLabel()}" th:text="${form.patientLabel()}">Rana · Dr. Khoury · Tue 3 Nov 10:30 AM</p>
+    <!--/* .drawer-content is what the slide-over shows when the form is opened from Today or Week. */-->
+    <div class="drawer-content">
+        <a class="back-link" th:href="${returnTo == 'week'} ? @{/week(doctorId=${form.doctorId()}, start=${form.date()})} : @{/(date=${form.date()})}" data-drawer-close>
+            <svg class="icon flip-rtl" aria-hidden="true"><use href="#i-chevron-left"/></svg><span th:text="#{action.back}">Back</span></a>
+        <header class="page-head">
+            <div>
+                <div class="eyebrow"><svg class="icon" aria-hidden="true"><use href="#i-calendar-plus"/></svg>
+                    <span th:text="#{nav.today}">Today</span></div>
+                <h1 th:text="${form.appointmentId() == null} ? #{appointment.new.title} : #{appointment.reschedule.title}">New appointment</h1>
+            </div>
+        </header>
 
-    <form method="post" class="card stack"
-          th:action="${form.appointmentId() == null} ? @{/appointments} : @{/appointments/{id}/reschedule(id=${form.appointmentId()})}">
-
-        <div class="row" th:if="${form.appointmentId() == null}">
-            <label>
-                <span th:text="#{form.doctor}">Doctor</span>
-                <select name="doctorId" th:hx-get="@{/appointments/slots}" hx-target="#slots" hx-swap="outerHTML"
-                        hx-include="[name='date']" hx-trigger="change">
-                    <option th:each="d : ${doctors}" th:value="${d.id}" th:text="${d.displayName}"
-                            th:selected="${d.id == form.doctorId()}">Dr. Khoury</option>
-                </select>
-            </label>
+        <p class="alert" role="alert" th:if="${formError}">
+            <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg><span th:text="#{${formError}}">Error</span></p>
+        <div class="form-summary" th:if="${form.patientLabel()}">
+            <svg class="icon" aria-hidden="true"><use href="#i-move"/></svg>
+            <span th:text="${form.patientLabel()}">Rana · Dr. Khoury · Tue 3 Nov 10:30 AM</span>
         </div>
-        <input type="hidden" name="appointmentId" th:if="${form.appointmentId() != null}" th:value="${form.appointmentId()}">
 
-        <label>
-            <span th:text="#{form.date}">Date</span>
-            <input type="date" name="date" th:value="${form.date()}" required
-                   th:hx-get="@{/appointments/slots}" hx-target="#slots" hx-swap="outerHTML"
-                   hx-include="[name='doctorId'],[name='appointmentId']" hx-trigger="change">
-        </label>
+        <form method="post" class="stack"
+              th:action="${form.appointmentId() == null} ? @{/appointments} : @{/appointments/{id}/reschedule(id=${form.appointmentId()})}">
 
-        <fieldset th:fragment="slots" id="slots" class="slots">
-            <legend th:text="#{form.free-times}">Free times</legend>
-            <p class="muted" th:if="${slots.isEmpty()}" th:text="#{form.no-free-times}">No free times that day.</p>
-            <label class="slot" th:each="s : ${slots}">
-                <input type="radio" name="time" th:value="${s.value()}" th:checked="${s.value() == form.time()}">
-                <span th:text="${s.label()}">10:30 AM</span>
-            </label>
-        </fieldset>
+            <section class="form-section">
+                <h2><span class="step">1</span><span th:text="#{form.when}">When</span></h2>
+                <div class="form-grid">
+                    <label th:if="${form.appointmentId() == null}">
+                        <span th:text="#{form.doctor}">Doctor</span>
+                        <select name="doctorId" th:hx-get="@{/appointments/slots}" hx-target="#slots" hx-swap="outerHTML"
+                                hx-include="[name='date']" hx-trigger="change">
+                            <option th:each="d : ${doctors}" th:value="${d.id}" th:text="${d.displayName}"
+                                    th:selected="${d.id == form.doctorId()}">Dr. Khoury</option>
+                        </select>
+                    </label>
+                    <input type="hidden" name="appointmentId" th:if="${form.appointmentId() != null}" th:value="${form.appointmentId()}">
+                    <input type="hidden" name="returnTo" th:value="${returnTo}">
+                    <label>
+                        <span th:text="#{form.date}">Date</span>
+                        <input type="date" name="date" th:value="${form.date()}" required
+                               th:hx-get="@{/appointments/slots}" hx-target="#slots" hx-swap="outerHTML"
+                               hx-include="[name='doctorId'],[name='appointmentId']" hx-trigger="change">
+                    </label>
+                </div>
 
-        <label>
-            <span th:text="#{form.other-time}">Or another time</span>
-            <input type="time" name="otherTime" th:value="${form.otherTime()}">
-            <small class="muted" th:text="#{form.other-time.hint}">For squeezing someone in</small>
-        </label>
+                <fieldset th:fragment="slots" id="slots" class="slots-box">
+                    <legend><span th:text="#{form.free-times}">Free times</span>
+                        <span class="count" th:text="${slots.size()}">8</span></legend>
+                    <p class="muted small" th:if="${slots.isEmpty()}" th:text="#{form.no-free-times}">No free times that day.</p>
+                    <div class="slots" th:unless="${slots.isEmpty()}">
+                        <label class="slot" th:each="s : ${slots}">
+                            <input type="radio" name="time" th:value="${s.value()}" th:checked="${s.value() == form.time()}">
+                            <span th:text="${s.label()}">10:30 AM</span>
+                        </label>
+                    </div>
+                </fieldset>
 
-        <fieldset th:if="${form.appointmentId() == null}" class="stack">
-            <legend th:text="#{form.patient}">Patient</legend>
-            <label>
-                <span th:text="#{form.phone}">Phone</span>
-                <input type="tel" name="phone" th:value="${form.phone()}" required dir="ltr" inputmode="tel">
-                <small class="muted" th:text="#{form.phone.hint}">e.g. 03 123 456</small>
-            </label>
-            <label>
-                <span th:text="#{form.name}">Name</span>
-                <input type="text" name="name" th:value="${form.name()}">
-                <small class="muted" th:text="#{form.name.hint}">Needed for a new patient</small>
-            </label>
-            <label>
-                <span th:text="#{form.language}">Messages in</span>
-                <select name="language">
-                    <option value="ar" th:selected="${form.language() == 'ar'}" th:text="#{language.ar}">Arabic</option>
-                    <option value="en" th:selected="${form.language() == 'en'}" th:text="#{language.en}">English</option>
-                </select>
-            </label>
-        </fieldset>
+                <details class="other-time" th:open="${!#strings.isEmpty(form.otherTime())}">
+                    <summary><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg><span th:text="#{form.other-time}">Or another time</span></summary>
+                    <label>
+                        <input type="time" name="otherTime" th:value="${form.otherTime()}">
+                        <span class="hint" th:text="#{form.other-time.hint}">For squeezing someone in</span>
+                    </label>
+                </details>
+            </section>
 
-        <div class="buttons">
-            <button type="submit" class="primary"
-                    th:text="${form.appointmentId() == null} ? #{form.book} : #{form.move}">Book</button>
-            <a class="button" th:href="@{/(date=${form.date()})}" th:text="#{action.back}">Back</a>
-        </div>
-    </form>
+            <section class="form-section" th:if="${form.appointmentId() == null}">
+                <h2><span class="step">2</span><span th:text="#{form.patient}">Patient</span></h2>
+
+                <!--/*
+                  Patient dropdown: patients booked before, latest first, searchable by name or phone. Picking
+                  one fills phone, name and language below (app.js); a new patient's details are typed there.
+                  The search box has form="" so its text is never posted and Enter in it books nothing. With a
+                  known patient's phone already in the form (from Patients, or after an error), it shows them.
+                */-->
+                <div class="combo" data-combo th:with="sel=${hintPatient}">
+                    <span class="field-label" id="combo-label" th:text="#{form.patient.existing}">Existing patient</span>
+                    <div class="combo-field">
+                        <button type="button" class="combo-trigger" data-combo-trigger aria-haspopup="listbox" aria-expanded="false"
+                                aria-controls="combo-panel" aria-labelledby="combo-label combo-value">
+                            <span class="combo-value" id="combo-value">
+                                <span class="combo-placeholder" data-combo-empty th:hidden="${sel != null}">
+                                    <span class="combo-ghost"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg></span>
+                                    <span th:text="#{form.patient.choose}">Choose a patient booked before</span>
+                                </span>
+                                <span class="combo-chosen" data-combo-chosen th:hidden="${sel == null}">
+                                    <span class="avatar sm" data-chosen-avatar
+                                          th:style="${sel != null} ? '--hue:' + ${@avatars.hue(sel.name)}"
+                                          th:text="${sel != null} ? ${@avatars.initials(sel.name)}">RH</span>
+                                    <span class="combo-chosen-text">
+                                        <strong data-chosen-name th:text="${sel?.name}">Rana Haddad</strong>
+                                        <span dir="ltr" data-chosen-phone th:text="${sel?.phoneE164}">+96170123456</span>
+                                    </span>
+                                </span>
+                            </span>
+                            <svg class="icon combo-chevron" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+                        </button>
+                        <button type="button" class="combo-clear" data-combo-clear th:hidden="${sel == null}"
+                                th:title="#{form.patient.clear}" th:aria-label="#{form.patient.clear}">
+                            <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+                        <div class="combo-panel" id="combo-panel" data-combo-panel hidden>
+                            <div class="combo-search">
+                                <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+                                <input type="search" name="q" form="" autocomplete="off" dir="auto" data-patient-search
+                                       th:placeholder="#{form.patient.search}" th:aria-label="#{form.patient.search}"
+                                       role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="patient-results"
+                                       th:hx-get="@{/appointments/patients}" hx-trigger="input changed delay:200ms, search, combo-open"
+                                       hx-target="#patient-results" hx-swap="outerHTML" hx-sync="this:replace" hx-indicator=".combo-search">
+                                <span class="htmx-indicator combo-spinner" aria-hidden="true"></span>
+                            </div>
+                            <div th:fragment="patient-results" id="patient-results" class="combo-results" role="listbox"
+                                 th:aria-label="#{form.patient.existing}">
+                                <th:block th:if="${picked != null}">
+                                    <div class="combo-group" th:text="${#strings.isEmpty(pickerQuery)} ? #{form.patient.recent} : #{form.patient.matches}">Recently booked</div>
+                                    <div class="combo-empty" th:if="${picked.isEmpty()}">
+                                        <span class="combo-ghost"><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg></span>
+                                        <span>
+                                            <strong th:text="${#strings.isEmpty(pickerQuery)} ? #{form.patient.none-yet} : #{form.patient.none}">No match.</strong>
+                                            <span th:text="#{form.patient.type-below}">Type the new patient's details below.</span>
+                                        </span>
+                                    </div>
+                                    <button type="button" class="combo-option" role="option" aria-selected="false" tabindex="-1" data-pick
+                                            th:each="p, it : ${picked}" th:id="'patient-opt-' + ${it.index}"
+                                            th:attr="data-phone=${p.phone()},data-name=${p.name()},data-language=${p.language()}">
+                                        <span class="avatar sm" th:style="'--hue:' + ${@avatars.hue(p.name())}" th:text="${@avatars.initials(p.name())}">RH</span>
+                                        <span class="combo-option-main">
+                                            <strong data-hl th:text="${p.name()}">Rana Haddad</strong>
+                                            <span class="combo-option-meta">
+                                                <span dir="ltr" th:text="${p.phone()}">+96170123456</span>
+                                                <span th:classappend="${p.upcoming()} ? 'upcoming'"
+                                                      th:text="${p.upcoming()} ? #{form.patient.upcoming(${p.when()})} : #{form.patient.last(${p.when()})}">Last: Tue 3 Nov</span>
+                                            </span>
+                                        </span>
+                                        <span class="combo-option-tags">
+                                            <span class="chip chip-CANCELLED" th:if="${p.optedOut()}" th:text="#{patients.opted-out}">Opted out</span>
+                                            <span class="tag" th:text="#{'language.' + ${p.language()}}">Arabic</span>
+                                        </span>
+                                    </button>
+                                </th:block>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="picker-divider"><span th:text="#{form.patient.or-new}">Or type their details</span></div>
+                </div>
+
+                <label>
+                    <span th:text="#{form.phone}">Phone</span>
+                    <span class="field-icon">
+                        <svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg>
+                        <input type="tel" name="phone" th:value="${form.phone()}" required dir="ltr" inputmode="tel" autocomplete="off"
+                               th:hx-get="@{/appointments/patient-hint}" hx-trigger="input changed delay:300ms"
+                               hx-target="#patient-hint" hx-swap="outerHTML" hx-sync="this:replace">
+                    </span>
+                    <span class="hint" th:text="#{form.phone.hint}">e.g. 03 123 456</span>
+                </label>
+                <div th:fragment="patient-hint" id="patient-hint" class="patient-hint" aria-live="polite"
+                     th:classappend="${hintPatient != null} ? 'known' : (${hintPhone != null} ? 'new' : '')">
+                    <th:block th:if="${hintPatient != null}">
+                        <svg class="icon" aria-hidden="true"><use href="#i-user-check"/></svg>
+                        <span th:text="#{form.patient.known(${hintPatient.name})}">Known patient: Rana Haddad</span>
+                        <span class="chip chip-CANCELLED" th:if="${hintPatient.optedOut}" th:text="#{patients.opted-out}">Opted out</span>
+                    </th:block>
+                    <th:block th:if="${hintPatient == null and hintPhone != null}">
+                        <svg class="icon" aria-hidden="true"><use href="#i-sparkle"/></svg>
+                        <span th:text="#{form.patient.new}">New patient: enter their name</span>
+                    </th:block>
+                </div>
+                <label>
+                    <span th:text="#{form.name}">Name</span>
+                    <input type="text" name="name" th:value="${form.name()}" autocomplete="off">
+                    <span class="hint" th:text="#{form.name.hint}">Needed for a new patient</span>
+                </label>
+                <div class="stack tight">
+                    <span class="field-label" th:text="#{form.language}">Messages in</span>
+                    <div class="radio-pills" role="radiogroup" th:aria-label="#{form.language}">
+                        <label><input type="radio" name="language" value="ar" th:checked="${form.language() != 'en'}"><span th:text="#{language.ar}">Arabic</span></label>
+                        <label><input type="radio" name="language" value="en" th:checked="${form.language() == 'en'}"><span th:text="#{language.en}">English</span></label>
+                    </div>
+                </div>
+            </section>
+
+            <div class="form-actions">
+                <button type="submit" class="primary">
+                    <svg class="icon" aria-hidden="true"><use th:href="${form.appointmentId() == null} ? '#i-check' : '#i-move'"/></svg>
+                    <span th:text="${form.appointmentId() == null} ? #{form.book} : #{form.move}">Book</span></button>
+                <a class="button ghost" th:href="${returnTo == 'week'} ? @{/week(doctorId=${form.doctorId()}, start=${form.date()})} : @{/(date=${form.date()})}" data-drawer-close th:text="#{action.back}">Back</a>
+            </div>
+        </form>
+    </div>
 </main>
 </body>
 </html>

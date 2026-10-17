@@ -1,6 +1,7 @@
 package app.clinicreminders.dashboard;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 
 import app.clinicreminders.appointment.Appointment;
 import app.clinicreminders.appointment.AppointmentEvents.CancelledBy;
@@ -53,6 +54,9 @@ class TodayController {
         list.fill(ctx, day, model);
         model.addAttribute("dateLabel", ctx.formats().date(day));
         model.addAttribute("isToday", day.equals(ctx.today()));
+        long daysAway = ChronoUnit.DAYS.between(ctx.today(), day);
+        model.addAttribute("relativeDayKey", relativeDayKey(daysAway));
+        model.addAttribute("relativeDayCount", String.valueOf(Math.abs(daysAway)));
         model.addAttribute("previousDate", day.minusDays(1));
         model.addAttribute("nextDate", day.plusDays(1));
         return "dashboard/today";
@@ -67,36 +71,51 @@ class TodayController {
 
     @PostMapping("/appointments/{id}/arrived")
     String arrived(@PathVariable long id, @AuthenticationPrincipal StaffPrincipal staff, HttpServletRequest request,
-                   Model model, RedirectAttributes redirect, @RequestHeader(name = "HX-Request", required = false) String htmx) {
+                   Model model, RedirectAttributes redirect, @RequestHeader(name = "HX-Request", required = false) String htmx,
+                  @RequestParam(defaultValue = "") String returnTo) {
         Ctx ctx = context.of(staff, request);
         appointmentService.markArrived(ctx.clinicId(), id);
-        return respond(ctx, id, model, redirect, htmx);
+        return respond(ctx, id, model, redirect, htmx, returnTo);
     }
 
     @PostMapping("/appointments/{id}/no-show")
     String noShow(@PathVariable long id, @AuthenticationPrincipal StaffPrincipal staff, HttpServletRequest request,
-                  Model model, RedirectAttributes redirect, @RequestHeader(name = "HX-Request", required = false) String htmx) {
+                  Model model, RedirectAttributes redirect, @RequestHeader(name = "HX-Request", required = false) String htmx,
+                  @RequestParam(defaultValue = "") String returnTo) {
         Ctx ctx = context.of(staff, request);
         appointmentService.markNoShow(ctx.clinicId(), id);
-        return respond(ctx, id, model, redirect, htmx);
+        return respond(ctx, id, model, redirect, htmx, returnTo);
     }
 
     /** Staff cancellations don't message the patient (that would need its own approved template). */
     @PostMapping("/appointments/{id}/cancel")
     String cancel(@PathVariable long id, @AuthenticationPrincipal StaffPrincipal staff, HttpServletRequest request,
-                  Model model, RedirectAttributes redirect, @RequestHeader(name = "HX-Request", required = false) String htmx) {
+                  Model model, RedirectAttributes redirect, @RequestHeader(name = "HX-Request", required = false) String htmx,
+                  @RequestParam(defaultValue = "") String returnTo) {
         Ctx ctx = context.of(staff, request);
         appointmentService.cancel(ctx.clinicId(), id, CancelledBy.STAFF);
-        return respond(ctx, id, model, redirect, htmx);
+        return respond(ctx, id, model, redirect, htmx, returnTo);
     }
 
-    private String respond(Ctx ctx, long appointmentId, Model model, RedirectAttributes redirect, String htmx) {
+    /** "Today", "Tomorrow", "In 3 days", "2 days ago": the label above the date. */
+    static String relativeDayKey(long days) {
+        return days == 0 ? "today.relative.today" : days == 1 ? "today.relative.tomorrow"
+                : days == -1 ? "today.relative.yesterday" : days > 0 ? "today.relative.ahead" : "today.relative.ago";
+    }
+
+    /** @param returnTo "week" when the action came from Week (the appointment's details), so it goes back there */
+    private String respond(Ctx ctx, long appointmentId, Model model, RedirectAttributes redirect, String htmx,
+                           String returnTo) {
         Appointment appointment = appointments.findByIdAndClinicId(appointmentId, ctx.clinicId())
                 .orElseThrow(() -> new NotFoundException("Appointment", appointmentId));
         LocalDate date = ctx.dateOf(appointment.getStartsAt());
         if ("true".equals(htmx)) {
             list.fill(ctx, date, model);
             return "dashboard/today-list :: list";
+        }
+        if (returnTo.equals("week")) {
+            redirect.addFlashAttribute("notice", "notice.saved");
+            return WeekController.redirectToWeek(redirect, appointment.getDoctorId(), date);
         }
         redirect.addAttribute("date", date);
         return "redirect:/";

@@ -2,9 +2,21 @@
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'operator', ~{::main})}">
 <head><title th:text="${clinic.name}">Clinic</title></head>
 <body>
-<main class="container narrow">
-    <p><a th:href="@{/operator}" th:text="#{action.back}">Back</a></p>
-    <h1 th:text="${clinic.name}">Dr. Demo</h1>
+<main class="container">
+    <a class="back-link" th:href="@{/operator}">
+        <svg class="icon flip-rtl" aria-hidden="true"><use href="#i-chevron-left"/></svg><span th:text="#{operator.clinics}">Clinics</span></a>
+    <header class="page-head">
+        <div class="appt-who">
+            <span class="avatar lg square-avatar" th:style="'--hue:' + ${@avatars.hue(clinic.name)}" th:text="${@avatars.initials(clinic.name)}">DD</span>
+            <div>
+                <h1 th:text="${clinic.name}">Dr. Demo</h1>
+                <div class="tags">
+                    <span class="tag" dir="ltr" th:text="${clinic.timezone.id}">Asia/Beirut</span>
+                    <span class="tag" th:text="#{'language.' + ${clinic.defaultLanguage.code()}}">Arabic</span>
+                </div>
+            </div>
+        </div>
+    </header>
 
     <!--/* Shown once, right after the operator created a login or reset its password. */-->
     <div class="card password-once" th:if="${newPassword}" role="status">
@@ -12,107 +24,158 @@
         <p class="secret" dir="ltr" th:text="${newPassword.password()}">abcd-efgh-jkmn-pqrs</p>
         <p class="muted" th:text="#{operator.new-password.hint}">Shown only once.</p>
     </div>
-    <p class="notice" role="status" th:if="${testOutcome != null and testOutcome.result() == 'sent'}"
-       th:text="#{operator.test.sent(${testOutcome.detail()})}">Sent.</p>
-    <p class="alert" role="alert" th:if="${testOutcome != null and testOutcome.result() == 'failed'}"
-       th:text="#{operator.test.failed(${testOutcome.detail()})}">Meta refused.</p>
-    <p class="alert" role="alert" th:if="${testOutcome != null and testOutcome.result() == 'opted-out'}"
-       th:text="#{operator.test.opted-out}">Opted out.</p>
-    <p class="alert" role="alert" th:if="${metaError}" th:text="#{operator.subscribe.failed(${metaError})}">Meta refused.</p>
+    <p class="notice" role="status" th:if="${testOutcome != null and testOutcome.result() == 'sent'}">
+        <svg class="icon" aria-hidden="true"><use href="#i-check-circle"/></svg>
+        <span th:text="#{operator.test.sent(${testOutcome.detail()})}">Sent.</span></p>
+    <p class="alert" role="alert" th:if="${testOutcome != null and testOutcome.result() == 'failed'}">
+        <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg>
+        <span th:text="#{operator.test.failed(${testOutcome.detail()})}">Meta refused.</span></p>
+    <p class="alert" role="alert" th:if="${testOutcome != null and testOutcome.result() == 'opted-out'}">
+        <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg><span th:text="#{operator.test.opted-out}">Opted out.</span></p>
+    <p class="alert" role="alert" th:if="${metaError}">
+        <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg><span th:text="#{operator.subscribe.failed(${metaError})}">Meta refused.</span></p>
 
     <section class="card">
-        <h2 th:text="#{operator.details}">Details</h2>
-        <form method="post" th:action="@{/operator/clinics/{id}(id=${clinic.id})}" class="stack">
-            <label><span th:text="#{operator.clinic.name}">Name</span>
-                <input type="text" name="name" maxlength="100" th:value="${clinic.name}" required></label>
-            <label><span th:text="#{operator.clinic.timezone}">Timezone</span>
-                <input type="text" name="timezone" th:value="${clinic.timezone.id}" dir="ltr" required></label>
-            <label><span th:text="#{operator.clinic.language}">Patients' language</span>
-                <select name="defaultLanguage">
-                    <option value="ar" th:selected="${clinic.defaultLanguage.code() == 'ar'}" th:text="#{language.ar}">Arabic</option>
-                    <option value="en" th:selected="${clinic.defaultLanguage.code() == 'en'}" th:text="#{language.en}">English</option>
-                </select>
-            </label>
-            <div class="buttons"><button type="submit" class="primary" th:text="#{action.save}">Save</button></div>
-        </form>
+        <div class="progress-label"><strong th:text="#{operator.setup}">Setup</strong>
+            <span th:text="#{operator.ready(${ready + ''}, ${steps + ''})}">4 of 5</span></div>
+        <div class="progress"><span th:style="'width:' + ${100 * ready / steps} + '%'"></span></div>
+        <ul class="checklist">
+            <li class="done"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span th:text="#{operator.step.details}">Clinic details</span></li>
+            <li th:classappend="${connection.phoneNumberId() != null} ? 'done'">
+                <svg class="icon" aria-hidden="true"><use th:href="${connection.phoneNumberId() != null} ? '#i-check' : '#i-x'"/></svg>
+                <span th:text="#{operator.whatsapp.phone-number-id}">Phone number ID</span></li>
+            <li th:classappend="${connection.businessAccountId() != null} ? 'done'">
+                <svg class="icon" aria-hidden="true"><use th:href="${connection.businessAccountId() != null} ? '#i-check' : '#i-x'"/></svg>
+                <span th:text="#{operator.whatsapp.business-account-id}">WhatsApp Business Account ID</span></li>
+            <li th:classappend="${connection.hasToken()} ? 'done'">
+                <svg class="icon" aria-hidden="true"><use th:href="${connection.hasToken()} ? '#i-check' : '#i-x'"/></svg>
+                <span th:text="#{operator.whatsapp.token}">Access token</span></li>
+            <li th:classappend="${!logins.isEmpty()} ? 'done'">
+                <svg class="icon" aria-hidden="true"><use th:href="${!logins.isEmpty()} ? '#i-check' : '#i-x'"/></svg>
+                <span th:text="#{operator.step.logins}">At least one login</span></li>
+        </ul>
     </section>
 
-    <section class="card">
-        <h2 th:text="#{operator.whatsapp}">WhatsApp</h2>
-        <p class="muted" th:text="#{operator.whatsapp.hint}">From Meta Business Settings.</p>
-        <form method="post" th:action="@{/operator/clinics/{id}/whatsapp(id=${clinic.id})}" class="stack" autocomplete="off">
-            <label><span th:text="#{operator.whatsapp.phone-number-id}">Phone number ID</span>
-                <input type="text" name="phoneNumberId" maxlength="64" dir="ltr" th:value="${connection.phoneNumberId()}"></label>
-            <label><span th:text="#{operator.whatsapp.business-account-id}">WhatsApp Business Account ID</span>
-                <input type="text" name="businessAccountId" maxlength="64" dir="ltr" th:value="${connection.businessAccountId()}"></label>
-            <label><span th:text="#{operator.whatsapp.token}">Access token</span>
-                <!--/* Write-only: the saved token is never sent back to the browser. */-->
-                <input type="password" name="accessToken" maxlength="2048" dir="ltr" autocomplete="new-password"></label>
-            <p class="muted" th:text="${connection.hasToken()} ? #{operator.whatsapp.token.set} : #{operator.whatsapp.token.none}">No token saved.</p>
-            <label class="check" th:if="${connection.hasToken()}">
-                <input type="checkbox" name="removeToken" value="true">
-                <span th:text="#{operator.whatsapp.token.remove}">Remove the saved token</span>
-            </label>
-            <div class="buttons"><button type="submit" class="primary" th:text="#{action.save}">Save</button></div>
-        </form>
+    <div class="grid-2">
+        <section class="card">
+            <div class="section-head"><h2 th:text="#{operator.whatsapp}">WhatsApp</h2></div>
+            <p class="hint" th:text="#{operator.whatsapp.hint}">From Meta Business Settings.</p>
+            <form method="post" th:action="@{/operator/clinics/{id}/whatsapp(id=${clinic.id})}" class="stack" autocomplete="off">
+                <label><span th:text="#{operator.whatsapp.phone-number-id}">Phone number ID</span>
+                    <input type="text" name="phoneNumberId" maxlength="64" dir="ltr" th:value="${connection.phoneNumberId()}"></label>
+                <label><span th:text="#{operator.whatsapp.business-account-id}">WhatsApp Business Account ID</span>
+                    <input type="text" name="businessAccountId" maxlength="64" dir="ltr" th:value="${connection.businessAccountId()}"></label>
+                <label><span th:text="#{operator.whatsapp.token}">Access token</span>
+                    <!--/* Write-only: the saved token is never sent back to the browser. */-->
+                    <span class="field-icon">
+                        <svg class="icon" aria-hidden="true"><use href="#i-key"/></svg>
+                        <input type="password" id="access-token" name="accessToken" maxlength="2048" dir="ltr" autocomplete="new-password">
+                        <button type="button" class="reveal" data-reveal="access-token" aria-pressed="false" th:aria-label="#{login.show-password}">
+                            <svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></button>
+                    </span>
+                    <span class="hint" th:text="${connection.hasToken()} ? #{operator.whatsapp.token.set} : #{operator.whatsapp.token.none}">No token saved.</span>
+                </label>
+                <label class="check" th:if="${connection.hasToken()}">
+                    <input type="checkbox" name="removeToken" value="true">
+                    <span th:text="#{operator.whatsapp.token.remove}">Remove the saved token</span>
+                </label>
+                <div class="form-actions"><button type="submit" class="primary" th:text="#{action.save}">Save</button></div>
+            </form>
+        </section>
 
-        <h3 th:text="#{operator.subscribe}">Subscribe to webhooks</h3>
-        <p class="muted" th:text="#{operator.subscribe.hint(${webhookUrl})}">Once per clinic.</p>
-        <form method="post" th:action="@{/operator/clinics/{id}/subscribe(id=${clinic.id})}">
-            <button type="submit" th:text="#{operator.subscribe}">Subscribe to webhooks</button>
-        </form>
+        <div class="stack">
+            <section class="card">
+                <div class="section-head"><h2 th:text="#{operator.subscribe}">Subscribe to webhooks</h2></div>
+                <p class="hint" th:text="#{operator.subscribe.hint(${webhookUrl})}">Once per clinic.</p>
+                <form method="post" th:action="@{/operator/clinics/{id}/subscribe(id=${clinic.id})}">
+                    <button type="submit"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg>
+                        <span th:text="#{operator.subscribe}">Subscribe to webhooks</span></button>
+                </form>
+            </section>
+            <section class="card">
+                <div class="section-head"><h2 th:text="#{operator.test}">Test message</h2></div>
+                <p class="hint" th:text="#{operator.test.hint}">hello_world exists on Meta's test accounts.</p>
+                <form method="post" th:action="@{/operator/clinics/{id}/test(id=${clinic.id})}" class="stack">
+                    <label><span th:text="#{operator.test.to}">To</span>
+                        <input type="tel" name="to" dir="ltr" placeholder="+961 70 123 456" required></label>
+                    <div class="form-actions">
+                        <button type="submit" name="kind" value="hello"><svg class="icon" aria-hidden="true"><use href="#i-message"/></svg>
+                            <span th:text="#{operator.test.hello}">Send hello_world</span></button>
+                        <button type="submit" name="kind" value="reminder"><svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg>
+                            <span th:text="#{operator.test.reminder}">Send a sample reminder</span></button>
+                    </div>
+                </form>
+            </section>
+        </div>
+    </div>
 
-        <h3 th:text="#{operator.test}">Test message</h3>
-        <p class="muted" th:text="#{operator.test.hint}">hello_world exists on Meta's test accounts.</p>
-        <form method="post" th:action="@{/operator/clinics/{id}/test(id=${clinic.id})}" class="row">
-            <label><span th:text="#{operator.test.to}">To</span>
-                <input type="tel" name="to" dir="ltr" placeholder="+961 70 123 456" required></label>
-            <button type="submit" name="kind" value="hello" th:text="#{operator.test.hello}">Send hello_world</button>
-            <button type="submit" name="kind" value="reminder" th:text="#{operator.test.reminder}">Send a sample reminder</button>
-        </form>
-    </section>
+    <div class="grid-2">
+        <section class="card">
+            <div class="section-head"><h2 th:text="#{operator.logins}">Logins</h2><span class="count" th:text="${logins.size()}">2</span></div>
+            <p class="muted" th:if="${logins.isEmpty()}" th:text="#{operator.logins.none}">No logins yet.</p>
+            <ul class="inbox" th:unless="${logins.isEmpty()}">
+                <li class="inbox-item" th:each="u : ${logins}">
+                    <span class="avatar" th:style="'--hue:' + ${@avatars.hue(u.username)}" th:text="${@avatars.initials(u.username)}">RS</span>
+                    <div class="inbox-main">
+                        <strong dir="ltr" th:text="${u.username}">rana</strong>
+                        <div class="inbox-meta">
+                            <span th:text="#{'role.' + ${u.role.name()}}">Secretary</span>
+                            <span th:text="#{'language.' + ${u.language.code()}}">Arabic</span>
+                            <span class="chip chip-CANCELLED" th:unless="${u.enabled}" th:text="#{operator.login.disabled}">Disabled</span>
+                        </div>
+                    </div>
+                    <div class="inbox-actions">
+                        <form method="post" th:action="@{/operator/clinics/{id}/logins/{u}/reset(id=${clinic.id},u=${u.id})}">
+                            <button type="submit" class="sm"><svg class="icon" aria-hidden="true"><use href="#i-key"/></svg>
+                                <span th:text="#{operator.login.reset}">New password</span></button>
+                        </form>
+                        <form method="post" th:action="@{/operator/clinics/{id}/logins/{u}/enabled(id=${clinic.id},u=${u.id})}">
+                            <input type="hidden" name="enabled" th:value="${!u.enabled}">
+                            <button type="submit" class="sm" th:classappend="${u.enabled} ? 'danger'"
+                                    th:text="${u.enabled} ? #{operator.login.disable} : #{operator.login.enable}">Disable</button>
+                        </form>
+                    </div>
+                </li>
+            </ul>
+            <form method="post" th:action="@{/operator/clinics/{id}/logins(id=${clinic.id})}" class="inline-form">
+                <label><span th:text="#{operator.login.username}">Username</span>
+                    <input type="text" name="username" maxlength="40" dir="ltr" required></label>
+                <label><span th:text="#{operator.login.role}">Role</span>
+                    <select name="role">
+                        <option th:each="r : ${roles}" th:value="${r.name()}" th:text="#{'role.' + ${r.name()}}">Owner</option>
+                    </select>
+                </label>
+                <label><span th:text="#{operator.login.language}">Dashboard language</span>
+                    <select name="language">
+                        <option value="ar" th:text="#{language.ar}">Arabic</option>
+                        <option value="en" th:text="#{language.en}">English</option>
+                    </select>
+                </label>
+                <button type="submit" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                    <span th:text="#{operator.login.add}">Add a login</span></button>
+            </form>
+        </section>
 
-    <section class="card">
-        <h2 th:text="#{operator.logins}">Logins</h2>
-        <p class="muted" th:if="${logins.isEmpty()}" th:text="#{operator.logins.none}">No logins yet.</p>
-        <table class="list" th:unless="${logins.isEmpty()}">
-            <tbody>
-            <tr th:each="u : ${logins}">
-                <td dir="ltr"><strong th:text="${u.username}">rana</strong></td>
-                <td class="muted" th:text="#{'role.' + ${u.role.name()}}">Secretary</td>
-                <td class="muted" th:text="#{'language.' + ${u.language.code()}}">Arabic</td>
-                <td><span class="chip chip-CANCELLED" th:unless="${u.enabled}" th:text="#{operator.login.disabled}">Disabled</span></td>
-                <td class="actions">
-                    <form method="post" class="inline" th:action="@{/operator/clinics/{id}/logins/{u}/reset(id=${clinic.id},u=${u.id})}">
-                        <button type="submit" th:text="#{operator.login.reset}">New password</button>
-                    </form>
-                    <form method="post" class="inline" th:action="@{/operator/clinics/{id}/logins/{u}/enabled(id=${clinic.id},u=${u.id})}">
-                        <input type="hidden" name="enabled" th:value="${!u.enabled}">
-                        <button type="submit" th:classappend="${u.enabled} ? 'danger'"
-                                th:text="${u.enabled} ? #{operator.login.disable} : #{operator.login.enable}">Disable</button>
-                    </form>
-                </td>
-            </tr>
-            </tbody>
-        </table>
-        <h3 th:text="#{operator.login.add}">Add a login</h3>
-        <form method="post" th:action="@{/operator/clinics/{id}/logins(id=${clinic.id})}" class="row">
-            <label><span th:text="#{operator.login.username}">Username</span>
-                <input type="text" name="username" maxlength="40" dir="ltr" required></label>
-            <label><span th:text="#{operator.login.role}">Role</span>
-                <select name="role">
-                    <option th:each="r : ${roles}" th:value="${r.name()}" th:text="#{'role.' + ${r.name()}}">Owner</option>
-                </select>
-            </label>
-            <label><span th:text="#{operator.login.language}">Dashboard language</span>
-                <select name="language">
-                    <option value="ar" th:text="#{language.ar}">Arabic</option>
-                    <option value="en" th:text="#{language.en}">English</option>
-                </select>
-            </label>
-            <button type="submit" class="primary" th:text="#{action.add}">Add</button>
-        </form>
-    </section>
+        <section class="card">
+            <div class="section-head"><h2 th:text="#{operator.details}">Details</h2></div>
+            <form method="post" th:action="@{/operator/clinics/{id}(id=${clinic.id})}" class="stack">
+                <label><span th:text="#{operator.clinic.name}">Name</span>
+                    <input type="text" name="name" maxlength="100" th:value="${clinic.name}" required></label>
+                <label><span th:text="#{operator.clinic.timezone}">Timezone</span>
+                    <input type="text" name="timezone" th:value="${clinic.timezone.id}" dir="ltr" required></label>
+                <label><span th:text="#{operator.clinic.language}">Patients' language</span>
+                    <select name="defaultLanguage">
+                        <option value="ar" th:selected="${clinic.defaultLanguage.code() == 'ar'}" th:text="#{language.ar}">Arabic</option>
+                        <option value="en" th:selected="${clinic.defaultLanguage.code() == 'en'}" th:text="#{language.en}">English</option>
+                    </select>
+                </label>
+                <label><span th:text="#{operator.clinic.slot}">Appointment length (minutes)</span>
+                    <input type="number" name="slotMinutes" th:value="${clinic.slotMinutes}" min="5" max="240" step="5" required>
+                    <span class="hint" th:text="#{operator.clinic.slot.hint}">For every doctor of the clinic.</span></label>
+                <div class="form-actions"><button type="submit" class="primary" th:text="#{action.save}">Save</button></div>
+            </form>
+        </section>
+    </div>
 </main>
 </body>
 </html>
