@@ -25,7 +25,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
  * Patients: search by name or phone, see who has an appointment coming up, and delete on request
- * (SPEC section 5.3).
+ * (SPEC section 5.3). A doctor's login lists their own patients (those with an appointment with
+ * them) and only their own appointments; deleting is the front desk's.
  */
 @Controller
 class PatientsController {
@@ -57,12 +58,16 @@ class PatientsController {
     String search(@AuthenticationPrincipal StaffPrincipal staff, HttpServletRequest request, Model model,
                   @RequestParam(defaultValue = "") String q) {
         Ctx ctx = context.of(staff, request);
-        List<Patient> found = patients.search(ctx.clinicId(), q);
+        List<Patient> found = ctx.isDoctor()
+                ? patients.searchOfDoctor(ctx.clinicId(), ctx.doctorId(), q)
+                : patients.search(ctx.clinicId(), q);
         Map<Long, Appointment> nextByPatient = new HashMap<>();
         if (!found.isEmpty()) {
             for (Appointment a : appointments.findUpcomingOf(ctx.clinicId(), found.stream().map(Patient::getId).toList(),
                     ctx.now())) {
-                nextByPatient.putIfAbsent(a.getPatientId(), a);
+                if (ctx.sees(a.getDoctorId())) {
+                    nextByPatient.putIfAbsent(a.getPatientId(), a);
+                }
             }
         }
         Map<Long, String> doctorNames = new HashMap<>();

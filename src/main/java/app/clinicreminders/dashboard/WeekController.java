@@ -96,7 +96,11 @@ class WeekController {
                 @RequestParam(required = false) Long doctorId,
                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start) {
         Ctx ctx = context.of(staff, request);
-        List<Doctor> all = doctors.findByClinicIdOrderByDisplayName(ctx.clinicId()).stream().filter(Doctor::isActive).toList();
+        // A doctor's login has only their own week.
+        List<Doctor> all = doctors.findByClinicIdOrderByDisplayName(ctx.clinicId()).stream()
+                .filter(Doctor::isActive)
+                .filter(doctor -> ctx.sees(doctor.getId()))
+                .toList();
         LocalDate monday = mondayOf(start != null ? start : ctx.today());
         model.addAttribute("doctors", all);
         model.addAttribute("monday", monday);
@@ -123,6 +127,7 @@ class WeekController {
                    @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime start,
                    @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime end) {
         Ctx ctx = context.of(staff, request);
+        ctx.requireSees(doctorId, "Doctor", doctorId);
         if (date.isBefore(ctx.today())) {
             redirect.addFlashAttribute("error", "error.not-allowed");
         } else {
@@ -145,6 +150,7 @@ class WeekController {
         Ctx ctx = context.of(staff, request);
         Appointment appointment = appointments.findByIdAndClinicId(appointmentId, ctx.clinicId())
                 .orElseThrow(() -> new NotFoundException("Appointment", appointmentId));
+        ctx.requireSees(appointment.getDoctorId(), "Appointment", appointmentId);
         Instant newStart = ctx.instant(date, time);
         if (!isMovable(appointment, ctx.now()) || !newStart.isAfter(ctx.now())) {
             redirect.addFlashAttribute("error", "error.not-allowed");

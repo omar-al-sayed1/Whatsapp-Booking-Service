@@ -1,6 +1,7 @@
 package app.clinicreminders.staff;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 import app.clinicreminders.common.Language;
@@ -11,7 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Dashboard logins. The operator creates clinic logins and resets their passwords; passwords are
- * generated and shown once, never chosen by the operator. Everyone can then change their own.
+ * generated and shown once, never chosen by the operator. A doctor's login is made by the clinic's
+ * owner or secretary, who choose its username and password. Everyone can then change their own.
  */
 @Service
 @Transactional
@@ -49,6 +51,45 @@ public class StaffAccounts {
         String password = GeneratedPasswords.generate();
         users.save(StaffUser.clinicStaff(clinicId, name, passwordEncoder.encode(password), role, language));
         return new NewPassword(name, password);
+    }
+
+    /**
+     * A login for one of the clinic's doctors, with the username and password the owner or secretary
+     * chose. The database refuses a doctor of another clinic, and a second login for the same doctor.
+     *
+     * @throws IllegalArgumentException if the username isn't valid or the password too short ({@link #isLongEnough})
+     * @throws UsernameTakenException   if any clinic already has the username, ignoring case
+     */
+    public StaffUser createDoctorLogin(long clinicId, long doctorId, String username, String password, Language language) {
+        String name = requireFree(username);
+        requireLongEnough(password);
+        return users.save(StaffUser.doctor(clinicId, doctorId, name, passwordEncoder.encode(password), language));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<StaffUser> doctorLogin(long clinicId, long doctorId) {
+        return users.findByClinicIdAndDoctorId(clinicId, doctorId);
+    }
+
+    /** @throws IllegalArgumentException if the password is too short ({@link #isLongEnough}) */
+    public void setDoctorPassword(long clinicId, long doctorId, String password) {
+        requireLongEnough(password);
+        doctorUser(clinicId, doctorId).changePasswordHash(passwordEncoder.encode(password));
+    }
+
+    /** As {@link #setEnabled}, for a doctor's login. */
+    public void setDoctorLoginEnabled(long clinicId, long doctorId, boolean enabled) {
+        doctorUser(clinicId, doctorId).setEnabled(enabled);
+    }
+
+    /** 3-40 letters, digits, dots, dashes or underscores (whether it's free is another matter). */
+    public static boolean isValidUsername(String username) {
+        return USERNAME.matcher(username.strip()).matches();
+    }
+
+    /** At least {@link #MIN_PASSWORD_LENGTH} characters, not counting spaces around them. */
+    public static boolean isLongEnough(String password) {
+        return password.strip().length() >= MIN_PASSWORD_LENGTH;
     }
 
     public NewPassword resetPassword(long clinicId, long userId) {
@@ -99,7 +140,7 @@ public class StaffAccounts {
         if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
             return PasswordChange.WRONG_CURRENT_PASSWORD;
         }
-        if (newPassword.strip().length() < MIN_PASSWORD_LENGTH) {
+        if (!isLongEnough(newPassword)) {
             return PasswordChange.TOO_SHORT;
         }
         user.changePasswordHash(passwordEncoder.encode(newPassword));
@@ -115,6 +156,17 @@ public class StaffAccounts {
                 ? users.findByIdAndClinicIdIsNull(staff.id())
                 : users.findByIdAndClinicId(staff.id(), staff.clinicId()))
                 .orElseThrow(() -> new NotFoundException("Staff user", staff.id()));
+    }
+
+    private StaffUser doctorUser(long clinicId, long doctorId) {
+        return users.findByClinicIdAndDoctorId(clinicId, doctorId)
+                .orElseThrow(() -> new NotFoundException("Login of doctor", doctorId));
+    }
+
+    private static void requireLongEnough(String password) {
+        if (!isLongEnough(password)) {
+            throw new IllegalArgumentException("Passwords have at least " + MIN_PASSWORD_LENGTH + " characters");
+        }
     }
 
     private StaffUser clinicUser(long clinicId, long userId) {

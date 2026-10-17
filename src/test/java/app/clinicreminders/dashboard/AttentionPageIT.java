@@ -71,6 +71,19 @@ class AttentionPageIT extends DashboardTest {
                 .contains("Call");
     }
 
+    /** Needs attention is a bell beside the account menu, with the count, rather than a sidebar item. */
+    @Test
+    void theBellBesideTheAccountShowsHowManyNeedAttention() {
+        flagged(clinic, "+96170123456");
+
+        assertThat(get(staff, "/")).bodyText()
+                .contains("class=\"bell has-alerts\" href=\"/attention\"", "aria-label=\"Needs attention (1)\"")
+                .doesNotContain("<span>Needs attention</span>");
+        assertThat(get(staff, "/attention")).bodyText()
+                .contains("class=\"bell active has-alerts\" href=\"/attention\"",
+                        "aria-label=\"Needs attention (1)\" aria-current=\"page\"");
+    }
+
     @Test
     void failuresOlderThanAWeekDropOff() {
         whatsApp.failNext(WhatsAppException.fromMetaError(131026, "Message undeliverable"));

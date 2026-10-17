@@ -35,8 +35,9 @@ If a library isn't compatible with Spring Boot 4 yet, tell me before downgrading
 - Run all tests: `./mvnw verify` (needs Docker: `*IT` classes use Testcontainers)
 - Unit tests only, no Docker: `./mvnw test` (`*Test` classes)
 - Health check: `http://localhost:8080/actuator/health`
-- Dashboard: `http://localhost:8080/`. Dev profile logins: `owner` / `dev`, `secretary` / `dev` and
-  `operator` / `dev` (created by `DevDataInitializer`, dev profile only)
+- Dashboard: `http://localhost:8080/`. Dev profile logins: `owner` / `dev`, `secretary` / `dev`,
+  `doctor` / `dev` (Dr. Dev's own login: his appointments, patients and hours only) and `operator` / `dev`
+  (created by `DevDataInitializer`, dev profile only)
 - Operator pages (onboarding clinics): `http://localhost:8080/operator`
 - First operator login on a new server: `java -jar app.jar --create-operator=<username>` (locally:
   `./mvnw spring-boot:run "-Dspring-boot.run.arguments=--create-operator=<username>"`). Prints a

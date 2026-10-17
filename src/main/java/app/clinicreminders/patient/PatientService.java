@@ -45,6 +45,13 @@ public class PatientService {
         return patients.search(clinicId, name, searchDigits(name));
     }
 
+    /** As {@link #search}, among the patients with an appointment with that doctor. */
+    @Transactional(readOnly = true)
+    public List<Patient> searchOfDoctor(long clinicId, long doctorId, String query) {
+        String name = query.strip();
+        return patients.searchOfDoctor(clinicId, doctorId, name, searchDigits(name));
+    }
+
     /**
      * For the booking form's patient picker: patients booked at least once, latest first, matched
      * like {@link #search}. An empty query gives the most recently booked.
@@ -53,6 +60,13 @@ public class PatientService {
     public List<BookedPatient> searchBooked(long clinicId, String query) {
         String name = query.strip();
         return patients.searchBooked(clinicId, name, searchDigits(name));
+    }
+
+    /** As {@link #searchBooked}, counting only appointments with that doctor. */
+    @Transactional(readOnly = true)
+    public List<BookedPatient> searchBookedWithDoctor(long clinicId, long doctorId, String query) {
+        String name = query.strip();
+        return patients.searchBookedWithDoctor(clinicId, doctorId, name, searchDigits(name));
     }
 
     /** The digits typed, without a leading 0 (03 123 456 is stored as +9613123456); none if fewer than 3. */

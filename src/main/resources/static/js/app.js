@@ -112,13 +112,14 @@
         });
     });
 
+    /* A form with data-confirm="question?" asks first; data-confirm-calm for one that loses nothing. */
     document.addEventListener("submit", event => {
         const form = event.target;
         if (!form.dataset.confirm || form.dataset.confirmed) {
             return;
         }
         event.preventDefault();
-        ask(form.dataset.confirm).then(ok => {
+        ask(form.dataset.confirm, {calm: "confirmCalm" in form.dataset}).then(ok => {
             if (ok) {
                 form.dataset.confirmed = "1";
                 form.requestSubmit(event.submitter);

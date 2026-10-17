@@ -12,7 +12,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 /**
  * The logged-in staff user. Dashboard code takes the clinic from here, never from the request,
- * so a user can only ever see and change their own clinic.
+ * so a user can only ever see and change their own clinic; likewise a doctor's own doctor.
+ *
+ * @param doctorId for a doctor's login, the doctor whose appointments, patients and hours it sees
  */
 public record StaffPrincipal(
         long id,
@@ -21,11 +23,18 @@ public record StaffPrincipal(
         String passwordHash,
         StaffRole role,
         Language language,
-        boolean enabled) implements UserDetails {
+        boolean enabled,
+        @Nullable Long doctorId) implements UserDetails {
+
+    /** Anyone but a doctor. */
+    public StaffPrincipal(long id, @Nullable Long clinicId, String username, String passwordHash, StaffRole role,
+                          Language language, boolean enabled) {
+        this(id, clinicId, username, passwordHash, role, language, enabled, null);
+    }
 
     public static StaffPrincipal of(StaffUser user) {
         return new StaffPrincipal(user.getId(), user.getClinicId(), user.getUsername(), user.getPasswordHash(),
-                user.getRole(), user.getLanguage(), user.isEnabled());
+                user.getRole(), user.getLanguage(), user.isEnabled(), user.getDoctorId());
     }
 
     /** @throws AccessDeniedException for operators, who have no clinic */
@@ -58,6 +67,7 @@ public record StaffPrincipal(
 
     @Override
     public String toString() {
-        return "StaffPrincipal[id=" + id + ", clinicId=" + clinicId + ", username=" + username + ", role=" + role + "]";
+        return "StaffPrincipal[id=" + id + ", clinicId=" + clinicId + ", username=" + username + ", role=" + role
+                + (doctorId == null ? "" : ", doctorId=" + doctorId) + "]";
     }
 }

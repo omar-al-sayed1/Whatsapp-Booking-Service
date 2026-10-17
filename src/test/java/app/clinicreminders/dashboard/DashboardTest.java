@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import app.clinicreminders.IntegrationTest;
 import app.clinicreminders.clinic.Clinic;
 import app.clinicreminders.common.Language;
+import app.clinicreminders.scheduling.Doctor;
 import app.clinicreminders.staff.StaffPrincipal;
 import app.clinicreminders.staff.StaffRole;
 import app.clinicreminders.staff.StaffUser;
@@ -34,6 +35,13 @@ abstract class DashboardTest extends IntegrationTest {
     protected StaffPrincipal staffOf(Clinic clinic, StaffRole role, Language language) {
         StaffUser user = users.save(StaffUser.clinicStaff(clinic.getId(), "user" + sequence.incrementAndGet(),
                 "{noop}secret", role, language));
+        return StaffPrincipal.of(user);
+    }
+
+    /** The login of one doctor of the clinic, who sees only that doctor's appointments, patients and hours. */
+    protected StaffPrincipal doctorLoginOf(Doctor doctor) {
+        StaffUser user = users.save(StaffUser.doctor(doctor.getClinicId(), doctor.getId(), "doctor" + sequence.incrementAndGet(),
+                "{noop}secret", Language.EN));
         return StaffPrincipal.of(user);
     }
 

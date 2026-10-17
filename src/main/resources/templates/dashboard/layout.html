@@ -46,11 +46,16 @@
                 <svg class="icon" aria-hidden="true"><use href="#i-week"/></svg><span th:text="#{nav.week}">Week</span></a>
             <a th:href="@{/patients}" th:classappend="${active == 'patients'} ? 'active'" th:attr="aria-current=${active == 'patients'} ? 'page'">
                 <svg class="icon" aria-hidden="true"><use href="#i-users"/></svg><span th:text="#{nav.patients}">Patients</span></a>
-            <a th:href="@{/attention}" th:classappend="${active == 'attention'} ? 'active'" th:attr="aria-current=${active == 'attention'} ? 'page'">
-                <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg><span th:text="#{nav.attention}">Needs attention</span>
-                <span class="nav-badge" th:if="${attentionCount != null and attentionCount > 0}" th:text="${attentionCount}">2</span></a>
-            <a th:href="@{/settings}" th:classappend="${active == 'settings'} ? 'active'" th:attr="aria-current=${active == 'settings'} ? 'page'">
-                <svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg><span th:text="#{nav.settings}">Settings</span></a>
+            <!--/* A doctor's login: their own hours instead of the doctors, the clinic's settings and the inbox. */-->
+            <a th:if="${staff.doctorId() != null}" th:href="@{/doctors/{id}(id=${staff.doctorId()})}"
+               th:classappend="${active == 'doctors'} ? 'active'" th:attr="aria-current=${active == 'doctors'} ? 'page'">
+                <svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg><span th:text="#{nav.my-hours}">My hours</span></a>
+            <th:block th:if="${staff.doctorId() == null}">
+                <a th:href="@{/doctors}" th:classappend="${active == 'doctors'} ? 'active'" th:attr="aria-current=${active == 'doctors'} ? 'page'">
+                    <svg class="icon" aria-hidden="true"><use href="#i-stethoscope"/></svg><span th:text="#{nav.doctors}">Doctors</span></a>
+                <a th:href="@{/settings}" th:classappend="${active == 'settings'} ? 'active'" th:attr="aria-current=${active == 'settings'} ? 'page'">
+                    <svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg><span th:text="#{nav.settings}">Settings</span></a>
+            </th:block>
         </nav>
         <nav class="side-nav" th:if="${staff.clinicId() == null}" th:aria-label="#{app.name}">
             <span class="nav-label" th:text="#{operator.title}">Operator</span>
@@ -58,41 +63,52 @@
                 <svg class="icon" aria-hidden="true"><use href="#i-building"/></svg><span th:text="#{nav.clinics}">Clinics</span></a>
         </nav>
 
+        <!--/* The account menu, and beside it (clinic staff) the bell for Needs attention with its count. */-->
         <div class="side-foot">
-            <details class="menu">
-                <summary th:aria-label="#{nav.menu}">
-                    <span class="avatar sm" th:style="'--hue:' + ${@avatars.hue(staff.username)}"
-                          th:text="${@avatars.initials(staff.username)}">OM</span>
-                    <span class="menu-who">
-                        <strong th:text="${staff.username}">owner</strong>
-                        <span th:text="#{'role.' + ${staff.role().name()}}">Owner</span>
-                    </span>
-                    <svg class="icon" aria-hidden="true"><use href="#i-chevron-up"/></svg>
-                </summary>
-                <div class="menu-panel">
-                    <div class="menu-title" th:text="#{theme.title}">Theme</div>
-                    <div class="theme-switch" role="group" th:aria-label="#{theme.title}">
-                        <button type="button" data-theme-choice="auto" aria-pressed="true">
-                            <svg class="icon" aria-hidden="true"><use href="#i-monitor"/></svg><span th:text="#{theme.auto}">Auto</span></button>
-                        <button type="button" data-theme-choice="light" aria-pressed="false">
-                            <svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg><span th:text="#{theme.light}">Light</span></button>
-                        <button type="button" data-theme-choice="dark" aria-pressed="false">
-                            <svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg><span th:text="#{theme.dark}">Dark</span></button>
+            <div class="account-row">
+                <details class="menu">
+                    <summary th:aria-label="#{nav.menu}">
+                        <span class="avatar sm" th:style="'--hue:' + ${@avatars.hue(staff.username)}"
+                              th:text="${@avatars.initials(staff.username)}">OM</span>
+                        <span class="menu-who">
+                            <strong th:text="${staff.username}">owner</strong>
+                            <span th:text="#{'role.' + ${staff.role().name()}}">Owner</span>
+                        </span>
+                        <svg class="icon" aria-hidden="true"><use href="#i-chevron-up"/></svg>
+                    </summary>
+                    <div class="menu-panel">
+                        <div class="menu-title" th:text="#{theme.title}">Theme</div>
+                        <div class="theme-switch" role="group" th:aria-label="#{theme.title}">
+                            <button type="button" data-theme-choice="auto" aria-pressed="true">
+                                <svg class="icon" aria-hidden="true"><use href="#i-monitor"/></svg><span th:text="#{theme.auto}">Auto</span></button>
+                            <button type="button" data-theme-choice="light" aria-pressed="false">
+                                <svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg><span th:text="#{theme.light}">Light</span></button>
+                            <button type="button" data-theme-choice="dark" aria-pressed="false">
+                                <svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg><span th:text="#{theme.dark}">Dark</span></button>
+                        </div>
+                        <form method="post" th:action="@{/language}">
+                            <input type="hidden" name="lang" th:value="${otherLang}">
+                            <button type="submit" class="menu-item" th:lang="${otherLang}">
+                                <svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg>
+                                <span th:text="#{'language.switch.' + ${otherLang}}">English</span></button>
+                        </form>
+                        <a th:href="@{/account/password}"><svg class="icon" aria-hidden="true"><use href="#i-key"/></svg><span th:text="#{nav.password}">Password</span></a>
+                        <hr>
+                        <form method="post" th:action="@{/logout}">
+                            <button type="submit" class="menu-item"><svg class="icon flip-rtl" aria-hidden="true"><use href="#i-logout"/></svg>
+                                <span th:text="#{nav.logout}">Log out</span></button>
+                        </form>
                     </div>
-                    <form method="post" th:action="@{/language}">
-                        <input type="hidden" name="lang" th:value="${otherLang}">
-                        <button type="submit" class="menu-item" th:lang="${otherLang}">
-                            <svg class="icon" aria-hidden="true"><use href="#i-globe"/></svg>
-                            <span th:text="#{'language.switch.' + ${otherLang}}">English</span></button>
-                    </form>
-                    <a th:href="@{/account/password}"><svg class="icon" aria-hidden="true"><use href="#i-key"/></svg><span th:text="#{nav.password}">Password</span></a>
-                    <hr>
-                    <form method="post" th:action="@{/logout}">
-                        <button type="submit" class="menu-item"><svg class="icon flip-rtl" aria-hidden="true"><use href="#i-logout"/></svg>
-                            <span th:text="#{nav.logout}">Log out</span></button>
-                    </form>
-                </div>
-            </details>
+                </details>
+                <a class="bell" th:if="${staff.clinicId() != null and staff.doctorId() == null}" th:href="@{/attention}"
+                   th:classappend="(${active == 'attention'} ? 'active ' : '') + (${attentionCount != null and attentionCount > 0} ? 'has-alerts' : '')"
+                   th:attr="aria-current=${active == 'attention'} ? 'page'"
+                   th:title="#{nav.attention}"
+                   th:aria-label="${attentionCount != null and attentionCount > 0} ? #{nav.attention} + ' (' + ${attentionCount} + ')' : #{nav.attention}">
+                    <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg>
+                    <span class="nav-badge" aria-hidden="true" th:if="${attentionCount != null and attentionCount > 0}" th:text="${attentionCount}">2</span>
+                </a>
+            </div>
         </div>
     </aside>
 

@@ -45,6 +45,9 @@ class DashboardModel {
         if (staff != null && staff.clinicId() != null && !"true".equals(request.getHeader("HX-Request"))) {
             long clinicId = staff.clinicId();
             clinics.findById(clinicId).ifPresent(clinic -> model.addAttribute("clinicName", clinic.getName()));
+            if (staff.doctorId() != null) {
+                return; // Needs attention is the front desk's
+            }
             model.addAttribute("attentionCount",
                     conversations.findByClinicIdAndNeedsHumanTrueOrderByUpdatedAtDesc(clinicId).size()
                             + logs.findFailedSince(clinicId, clock.instant().minus(AttentionController.FAILED_SENDS_WINDOW)).size());

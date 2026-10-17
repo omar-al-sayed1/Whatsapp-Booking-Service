@@ -54,11 +54,14 @@ class TodayList {
         this.appointments = appointments;
     }
 
+    /** A doctor's login sees their own column only, and the figures are theirs. */
     void fill(Ctx ctx, LocalDate date, Model model) {
-        List<AppointmentView> views = appointments.findViews(ctx.clinicId(), ctx.startOf(date), ctx.startOf(date.plusDays(1)));
+        List<AppointmentView> views = appointments.findViews(ctx.clinicId(), ctx.startOf(date), ctx.startOf(date.plusDays(1)))
+                .stream().filter(view -> ctx.sees(view.doctorId())).toList();
         Map<Long, List<AppointmentView>> byDoctor = views.stream().collect(Collectors.groupingBy(AppointmentView::doctorId));
         boolean today = date.equals(ctx.today());
         List<DoctorDay> days = doctors.findByClinicIdOrderByDisplayName(ctx.clinicId()).stream()
+                .filter(doctor -> ctx.sees(doctor.getId()))
                 .filter(doctor -> doctor.isActive() || byDoctor.containsKey(doctor.getId()))
                 .map(doctor -> day(ctx, today, doctor, byDoctor.getOrDefault(doctor.getId(), List.of())))
                 .toList();

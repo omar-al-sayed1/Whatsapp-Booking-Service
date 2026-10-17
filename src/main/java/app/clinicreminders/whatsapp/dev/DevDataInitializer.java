@@ -64,6 +64,7 @@ class DevDataInitializer implements ApplicationRunner {
         Clinic clinic = clinics.findByWaPhoneNumberId(DEV_PHONE_NUMBER_ID).orElseGet(this::createClinic);
         ensureUser(clinic, "owner", StaffRole.OWNER);
         ensureUser(clinic, "secretary", StaffRole.SECRETARY);
+        ensureDoctorUser(clinic);
         if (users.findByUsernameIgnoreCase("operator").isEmpty()) {
             users.save(StaffUser.operator("operator", passwordEncoder.encode(DEV_PASSWORD), Language.EN));
             log.info("Created dev login 'operator' (password '{}')", DEV_PASSWORD);
@@ -85,6 +86,17 @@ class DevDataInitializer implements ApplicationRunner {
         patients.save(new Patient(clinic.getId(), "Dev Patient", "+96170000001", Language.AR));
         log.info("Created the dev clinic; simulate patients at /dev/whatsapp");
         return clinic;
+    }
+
+    /** "doctor": the login of the clinic's first doctor, who sees only their own day. */
+    private void ensureDoctorUser(Clinic clinic) {
+        if (users.findByUsernameIgnoreCase("doctor").isPresent()) {
+            return;
+        }
+        doctors.findByClinicIdOrderByDisplayName(clinic.getId()).stream().findFirst().ifPresent(doctor -> {
+            users.save(StaffUser.doctor(clinic.getId(), doctor.getId(), "doctor", passwordEncoder.encode(DEV_PASSWORD), Language.AR));
+            log.info("Created dev login 'doctor' for {} (password '{}')", doctor.getDisplayName(), DEV_PASSWORD);
+        });
     }
 
     private void ensureUser(Clinic clinic, String username, StaffRole role) {

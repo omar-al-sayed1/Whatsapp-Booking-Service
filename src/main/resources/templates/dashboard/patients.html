@@ -45,7 +45,8 @@
                                 <span class="tag" th:text="#{'language.' + ${p.language()}}">Arabic</span>
                             </div>
                         </div>
-                        <form method="post" th:action="@{/patients/{id}/delete(id=${p.id()})}" th:data-confirm="#{patients.delete-confirm}">
+                        <form method="post" th:action="@{/patients/{id}/delete(id=${p.id()})}" th:data-confirm="#{patients.delete-confirm}"
+                              th:if="${staff.doctorId() == null}">
                             <button type="submit" class="icon-btn ghost-danger" th:title="#{action.delete}" th:aria-label="#{action.delete}">
                                 <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button>
                         </form>

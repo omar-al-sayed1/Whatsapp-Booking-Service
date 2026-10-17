@@ -62,8 +62,11 @@ public class ScheduleSettings {
         rules.save(new ScheduleRule(clinicId, doctorId, day, window));
     }
 
-    public void removeWeeklyHours(long clinicId, long ruleId) {
-        rules.delete(rules.findByIdAndClinicId(ruleId, clinicId).orElseThrow(() -> new NotFoundException("Hours", ruleId)));
+    /** Only that doctor's hours: another doctor's (or clinic's) are not found. */
+    public void removeWeeklyHours(long clinicId, long doctorId, long ruleId) {
+        rules.delete(rules.findByIdAndClinicId(ruleId, clinicId)
+                .filter(rule -> rule.getDoctorId() == doctorId)
+                .orElseThrow(() -> new NotFoundException("Hours", ruleId)));
     }
 
     /**
@@ -79,8 +82,10 @@ public class ScheduleSettings {
                         : ScheduleException.withHours(clinicId, doctorId, date, hours)));
     }
 
-    public void removeDay(long clinicId, long exceptionId) {
+    /** Only that doctor's day: another doctor's (or clinic's) is not found. */
+    public void removeDay(long clinicId, long doctorId, long exceptionId) {
         exceptions.delete(exceptions.findByIdAndClinicId(exceptionId, clinicId)
+                .filter(day -> day.getDoctorId() == doctorId)
                 .orElseThrow(() -> new NotFoundException("Day", exceptionId)));
     }
 

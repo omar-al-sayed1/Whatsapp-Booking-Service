@@ -16,6 +16,7 @@ import app.clinicreminders.common.Language;
 import app.clinicreminders.common.NotFoundException;
 import app.clinicreminders.common.PhoneNumbers;
 import app.clinicreminders.dashboard.ClinicContext.Ctx;
+import app.clinicreminders.patient.BookedPatient;
 import app.clinicreminders.patient.Patient;
 import app.clinicreminders.patient.PatientRepository;
 import app.clinicreminders.patient.PatientService;
@@ -89,7 +90,7 @@ class AppointmentFormController {
                           @RequestParam(defaultValue = "") String phone, @RequestParam(defaultValue = "") String name) {
         Ctx ctx = context.of(staff, request);
         List<Doctor> active = activeDoctors(ctx);
-        Long doctor = doctorId != null ? doctorId : active.isEmpty() ? null : active.getFirst().getId();
+        Long doctor = doctorId != null && ctx.sees(doctorId) ? doctorId : active.isEmpty() ? null : active.getFirst().getId();
         // Booking a known patient (from the Patients page): their language, not the clinic default.
         String language = Optional.ofNullable(PhoneNumbers.parseLebanese(phone))
                 .flatMap(phoneE164 -> patients.findByClinicIdAndPhoneE164(ctx.clinicId(), phoneE164))
@@ -106,7 +107,10 @@ class AppointmentFormController {
                          @RequestParam(defaultValue = "") String q) {
         Ctx ctx = context.of(staff, request);
         model.addAttribute("pickerQuery", q.strip());
-        model.addAttribute("picked", patientService.searchBooked(ctx.clinicId(), q).stream()
+        List<BookedPatient> found = ctx.isDoctor()
+                ? patientService.searchBookedWithDoctor(ctx.clinicId(), ctx.doctorId(), q)
+                : patientService.searchBooked(ctx.clinicId(), q);
+        model.addAttribute("picked", found.stream()
                 .map(p -> new PickerRow(p.name(), p.phoneE164(), p.language().code(), p.optedOut(),
                         ctx.formats().dayShort(ctx.dateOf(p.lastAppointment())), p.lastAppointment().isAfter(ctx.now())))
                 .toList());
@@ -131,6 +135,9 @@ class AppointmentFormController {
                        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         Ctx ctx = context.of(staff, request);
         Long doctor = appointmentId != null ? appointment(ctx, appointmentId).getDoctorId() : doctorId;
+        if (doctor != null) {
+            ctx.requireSees(doctor, "Doctor", doctor);
+        }
         model.addAttribute("slots", doctor == null ? List.of() : slotOptions(ctx, doctor, date));
         model.addAttribute("form", new Form(appointmentId, doctor, date, "", "", "", "", "", null));
         return "dashboard/appointment-form :: slots";
@@ -152,6 +159,7 @@ class AppointmentFormController {
         if (doctorId == null) {
             return showForm(ctx, form, "error.doctor-required", model);
         }
+        ctx.requireSees(doctorId, "Doctor", doctorId);
         if (phoneE164 == null) {
             return showForm(ctx, form, "error.phone", model);
         }
@@ -256,12 +264,19 @@ class AppointmentFormController {
                 .toList();
     }
 
+    /** The doctors one can book for: the active ones, or for a doctor's login only themself. */
     private List<Doctor> activeDoctors(Ctx ctx) {
-        return doctors.findByClinicIdOrderByDisplayName(ctx.clinicId()).stream().filter(Doctor::isActive).toList();
+        return doctors.findByClinicIdOrderByDisplayName(ctx.clinicId()).stream()
+                .filter(Doctor::isActive)
+                .filter(doctor -> ctx.sees(doctor.getId()))
+                .toList();
     }
 
     private Appointment appointment(Ctx ctx, long id) {
-        return appointments.findByIdAndClinicId(id, ctx.clinicId()).orElseThrow(() -> new NotFoundException("Appointment", id));
+        Appointment appointment = appointments.findByIdAndClinicId(id, ctx.clinicId())
+                .orElseThrow(() -> new NotFoundException("Appointment", id));
+        ctx.requireSees(appointment.getDoctorId(), "Appointment", id);
+        return appointment;
     }
 
     /** Booked or confirmed and not started yet. */

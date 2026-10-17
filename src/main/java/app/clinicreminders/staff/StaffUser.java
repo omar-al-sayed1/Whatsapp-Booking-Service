@@ -13,7 +13,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.Generated;
 
-/** A dashboard login. Operators have no clinic; everyone else belongs to exactly one. */
+/** A dashboard login. Operators have no clinic; everyone else belongs to exactly one, and a doctor's login to one doctor. */
 @Entity
 @Table(name = "staff_user")
 public class StaffUser {
@@ -24,6 +24,9 @@ public class StaffUser {
 
     @Column(name = "clinic_id")
     private Long clinicId;
+
+    @Column(name = "doctor_id")
+    private Long doctorId;
 
     private String username;
 
@@ -61,7 +64,17 @@ public class StaffUser {
         if (role == StaffRole.OPERATOR) {
             throw new IllegalArgumentException("Operators don't belong to a clinic");
         }
+        if (role == StaffRole.DOCTOR) {
+            throw new IllegalArgumentException("A doctor's login belongs to a doctor: use doctor(...)");
+        }
         return new StaffUser(clinicId, username, passwordHash, role, language);
+    }
+
+    /** The login of one doctor of the clinic. */
+    public static StaffUser doctor(long clinicId, long doctorId, String username, String passwordHash, Language language) {
+        StaffUser user = new StaffUser(clinicId, username, passwordHash, StaffRole.DOCTOR, language);
+        user.doctorId = doctorId;
+        return user;
     }
 
     /** A new password, already hashed by the caller. */
@@ -85,6 +98,11 @@ public class StaffUser {
 
     public Long getClinicId() {
         return clinicId;
+    }
+
+    /** The doctor this login is for; null for everyone but doctors. */
+    public Long getDoctorId() {
+        return doctorId;
     }
 
     public String getUsername() {

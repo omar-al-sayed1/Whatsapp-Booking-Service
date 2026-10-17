@@ -20,6 +20,9 @@ public interface StaffUserRepository extends Repository<StaffUser, Long> {
 
     List<StaffUser> findByClinicIdOrderByUsername(Long clinicId);
 
+    /** A doctor's login, if they have one. */
+    Optional<StaffUser> findByClinicIdAndDoctorId(Long clinicId, Long doctorId);
+
     long countByClinicId(Long clinicId);
 
     StaffUser save(StaffUser user);

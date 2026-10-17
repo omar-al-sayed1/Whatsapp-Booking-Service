@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'doctors', ~{::main})}">
+<head><title th:text="#{nav.doctors}">Doctors</title></head>
+<body>
+<main class="container">
+    <header class="page-head">
+        <div>
+            <div class="eyebrow"><svg class="icon" aria-hidden="true"><use href="#i-stethoscope"/></svg><span th:text="#{nav.doctors}">Doctors</span></div>
+            <h1 th:text="#{nav.doctors}">Doctors</h1>
+        </div>
+    </header>
+
+    <div class="grid-2">
+        <section class="card">
+            <div class="section-head"><h2 th:text="#{settings.doctors}">Doctors</h2><span class="count" th:text="${doctors.size()}">2</span></div>
+            <p class="muted" th:if="${doctors.isEmpty()}" th:text="#{today.no-doctors}">No doctors yet.</p>
+            <ul class="doctor-cards">
+                <li th:each="r : ${doctors}">
+                    <a class="doctor-card" th:classappend="${!r.doctor().active} ? 'inactive'"
+                       th:href="@{/doctors/{id}(id=${r.doctor().id})}">
+                        <span class="avatar lg" th:style="'--hue:' + ${@avatars.hue(r.doctor().displayName)}"
+                              th:text="${@avatars.initials(r.doctor().displayName)}">DK</span>
+                        <span class="grow">
+                            <strong th:text="${r.doctor().displayName}">Dr. Khoury</strong>
+                            <span class="tags">
+                                <span class="tag"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
+                                    <span th:text="#{settings.doctor.minutes(${r.doctor().slotMinutes + ''})}">30 min</span></span>
+                                <span class="tag" th:text="${r.doctor().active} ? #{settings.doctor.active} : #{settings.doctor.inactive}">Taking appointments</span>
+                            </span>
+                        </span>
+                        <span class="mini-week" th:aria-label="#{settings.hours}">
+                            <span th:each="w : ${weekdays}" th:classappend="${r.workingDays().contains(w.day())} ? 'on'" th:text="${w.letter()}">M</span>
+                        </span>
+                        <svg class="icon chevron flip-rtl" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+                    </a>
+                </li>
+            </ul>
+        </section>
+        <section class="card">
+            <div class="section-head"><h2 th:text="#{settings.doctor.add}">Add a doctor</h2></div>
+            <form method="post" th:action="@{/doctors}" class="stack add-doctor" autocomplete="off">
+                <label><span th:text="#{settings.doctor.name}">Name</span>
+                    <input type="text" name="displayName" th:value="${draftName}" required></label>
+                <p class="hint"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
+                    <span th:text="#{settings.slot-length.set-by-operator(${slotMinutes + ''})}">Appointments are 20 minutes long.</span></p>
+                <!--/* On: the doctor also gets a login (shown below the switch, CSS :has); the server checks it all. */-->
+                <label class="setting">
+                    <span><strong th:text="#{doctor.login.add}">Add a login</strong>
+                        <span class="hint" th:text="#{doctor.login.add.hint}">The doctor sees only their own appointments and patients.</span></span>
+                    <input type="checkbox" class="switch" name="addLogin" value="true" th:checked="${draftAddLogin == true}">
+                </label>
+                <div class="login-fields">
+                    <label><span th:text="#{operator.login.username}">Username</span>
+                        <input type="text" name="username" th:value="${draftUsername}" dir="ltr" autocomplete="off"
+                               autocapitalize="none" spellcheck="false" maxlength="40"></label>
+                    <label><span th:text="#{doctor.login.password}">Password</span>
+                        <span class="field-icon">
+                            <svg class="icon" aria-hidden="true"><use href="#i-key"/></svg>
+                            <input type="password" id="new-doctor-password" name="password" dir="ltr" autocomplete="new-password">
+                            <button type="button" class="reveal" data-reveal="new-doctor-password" aria-pressed="false" th:aria-label="#{login.show-password}">
+                                <svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></button>
+                        </span>
+                        <span class="hint" th:text="#{doctor.login.password.hint(${minPassword + ''})}">At least 10 characters.</span></label>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                        <span th:text="#{action.add}">Add</span></button>
+                </div>
+            </form>
+        </section>
+    </div>
+</main>
+</body>
+</html>

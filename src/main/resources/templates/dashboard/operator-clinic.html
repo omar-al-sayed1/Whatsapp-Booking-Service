@@ -125,11 +125,15 @@
                         </div>
                     </div>
                     <div class="inbox-actions">
-                        <form method="post" th:action="@{/operator/clinics/{id}/logins/{u}/reset(id=${clinic.id},u=${u.id})}">
+                        <!--/* Both ask first (app.js, data-confirm); the dialog is red only for Disable, like its button. */-->
+                        <form method="post" th:action="@{/operator/clinics/{id}/logins/{u}/reset(id=${clinic.id},u=${u.id})}"
+                              th:data-confirm="#{operator.login.reset-confirm(${u.username})}" data-confirm-calm>
                             <button type="submit" class="sm"><svg class="icon" aria-hidden="true"><use href="#i-key"/></svg>
                                 <span th:text="#{operator.login.reset}">New password</span></button>
                         </form>
-                        <form method="post" th:action="@{/operator/clinics/{id}/logins/{u}/enabled(id=${clinic.id},u=${u.id})}">
+                        <form method="post" th:action="@{/operator/clinics/{id}/logins/{u}/enabled(id=${clinic.id},u=${u.id})}"
+                              th:data-confirm="${u.enabled} ? #{operator.login.disable-confirm(${u.username})} : #{operator.login.enable-confirm(${u.username})}"
+                              th:attr="data-confirm-calm=${u.enabled} ? null : 'calm'">
                             <input type="hidden" name="enabled" th:value="${!u.enabled}">
                             <button type="submit" class="sm" th:classappend="${u.enabled} ? 'danger'"
                                     th:text="${u.enabled} ? #{operator.login.disable} : #{operator.login.enable}">Disable</button>

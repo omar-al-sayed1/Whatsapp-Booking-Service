@@ -44,6 +44,33 @@ public interface PatientRepository extends Repository<Patient, Long> {
             limit 8""")
     List<BookedPatient> searchBooked(Long clinicId, String name, String digits);
 
+    /** As {@link #search}, among one doctor's patients: those with at least one appointment with them. */
+    @Query("""
+            select p from Patient p
+            where p.clinicId = :clinicId
+              and exists (select 1 from Appointment a
+                          where a.patientId = p.id and a.clinicId = p.clinicId and a.doctorId = :doctorId)
+              and (lower(p.name) like lower(concat('%', :name, '%'))
+                   or (:digits <> '' and p.phoneE164 like concat('%', :digits, '%')))
+            order by p.name, p.id
+            limit 50""")
+    List<Patient> searchOfDoctor(Long clinicId, Long doctorId, String name, String digits);
+
+    /** As {@link #searchBooked}, counting only appointments with that doctor: a doctor's own picker. */
+    @Query("""
+            select new app.clinicreminders.patient.BookedPatient(p.id, p.name, p.phoneE164, p.language, p.optedOut,
+                                                                 max(a.startsAt))
+            from Patient p
+            join Appointment a on a.patientId = p.id and a.clinicId = p.clinicId
+            where p.clinicId = :clinicId
+              and a.doctorId = :doctorId
+              and (lower(p.name) like lower(concat('%', :name, '%'))
+                   or (:digits <> '' and p.phoneE164 like concat('%', :digits, '%')))
+            group by p.id, p.name, p.phoneE164, p.language, p.optedOut
+            order by max(a.startsAt) desc, p.id
+            limit 8""")
+    List<BookedPatient> searchBookedWithDoctor(Long clinicId, Long doctorId, String name, String digits);
+
     Patient save(Patient patient);
 
     void delete(Patient patient);

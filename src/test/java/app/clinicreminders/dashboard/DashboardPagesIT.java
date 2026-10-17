@@ -37,8 +37,8 @@ class DashboardPagesIT extends DashboardTest {
         StaffPrincipal staff = staffOf(clinic, StaffRole.SECRETARY, language);
         String dir = language == Language.AR ? "dir=\"rtl\"" : "dir=\"ltr\"";
 
-        for (String page : new String[] {"/", "/week", "/patients", "/attention", "/settings",
-                "/settings/doctors/" + doctor.getId(), "/appointments/new"}) {
+        for (String page : new String[] {"/", "/week", "/patients", "/attention", "/settings", "/doctors",
+                "/doctors/" + doctor.getId(), "/appointments/new"}) {
             assertThat(get(staff, page)).as(page)
                     .hasStatusOk()
                     .bodyText().contains(dir, "Clinic A");

@@ -269,6 +269,24 @@ class OperatorPagesIT extends DashboardTest {
     }
 
     @Test
+    void aNewPasswordAndDisablingOrEnablingAskFirst() {
+        post(operator, "/operator/clinics/{id}/logins", clinic.getId())
+                .param("username", "rana.sec").param("role", "SECRETARY").param("language", "ar").exchange();
+        long userId = users.findByUsernameIgnoreCase("rana.sec").orElseThrow().getId();
+
+        assertThat(get(operator, "/operator/clinics/{id}", clinic.getId())).bodyText()
+                .contains("data-confirm=\"Give rana.sec a new password? Their current password stops working right away",
+                        "data-confirm=\"Disable rana.sec? They will not be able to log in")
+                .containsOnlyOnce("data-confirm-calm");
+
+        post(operator, "/operator/clinics/{id}/logins/{u}/enabled", clinic.getId(), userId).param("enabled", "false").exchange();
+        assertThat(get(operator, "/operator/clinics/{id}", clinic.getId())).bodyText()
+                .contains("data-confirm=\"Enable rana.sec? They can log in again")
+                .as("New password and Enable are calm, only Disable is red")
+                .containsPattern("(?s)data-confirm-calm.*data-confirm-calm");
+    }
+
+    @Test
     void anotherClinicsLoginCantBeResetThroughThisClinic() {
         StaffPrincipal other = staffOf(data.clinic("B"), StaffRole.OWNER, Language.AR);
 

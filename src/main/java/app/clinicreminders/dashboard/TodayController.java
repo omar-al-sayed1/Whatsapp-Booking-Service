@@ -74,6 +74,7 @@ class TodayController {
                    Model model, RedirectAttributes redirect, @RequestHeader(name = "HX-Request", required = false) String htmx,
                   @RequestParam(defaultValue = "") String returnTo) {
         Ctx ctx = context.of(staff, request);
+        requireSees(ctx, id);
         appointmentService.markArrived(ctx.clinicId(), id);
         return respond(ctx, id, model, redirect, htmx, returnTo);
     }
@@ -83,6 +84,7 @@ class TodayController {
                   Model model, RedirectAttributes redirect, @RequestHeader(name = "HX-Request", required = false) String htmx,
                   @RequestParam(defaultValue = "") String returnTo) {
         Ctx ctx = context.of(staff, request);
+        requireSees(ctx, id);
         appointmentService.markNoShow(ctx.clinicId(), id);
         return respond(ctx, id, model, redirect, htmx, returnTo);
     }
@@ -93,6 +95,7 @@ class TodayController {
                   Model model, RedirectAttributes redirect, @RequestHeader(name = "HX-Request", required = false) String htmx,
                   @RequestParam(defaultValue = "") String returnTo) {
         Ctx ctx = context.of(staff, request);
+        requireSees(ctx, id);
         appointmentService.cancel(ctx.clinicId(), id, CancelledBy.STAFF);
         return respond(ctx, id, model, redirect, htmx, returnTo);
     }
@@ -101,6 +104,13 @@ class TodayController {
     static String relativeDayKey(long days) {
         return days == 0 ? "today.relative.today" : days == 1 ? "today.relative.tomorrow"
                 : days == -1 ? "today.relative.yesterday" : days > 0 ? "today.relative.ahead" : "today.relative.ago";
+    }
+
+    /** A doctor acts on their own appointments only; another doctor's are not found. */
+    private void requireSees(Ctx ctx, long appointmentId) {
+        Appointment appointment = appointments.findByIdAndClinicId(appointmentId, ctx.clinicId())
+                .orElseThrow(() -> new NotFoundException("Appointment", appointmentId));
+        ctx.requireSees(appointment.getDoctorId(), "Appointment", appointmentId);
     }
 
     /** @param returnTo "week" when the action came from Week (the appointment's details), so it goes back there */

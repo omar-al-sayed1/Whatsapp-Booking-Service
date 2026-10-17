@@ -190,6 +190,17 @@ kbd { font: 600 .72rem/1 "Plex", ui-monospace, monospace; padding: .18rem .38rem
              background: var(--danger); color: #fff; font-size: .72rem; font-weight: 700; display: grid; place-items: center; }
 
 .side-foot { margin-block-start: auto; display: flex; flex-direction: column; gap: .5rem; }
+/* The account menu with the Needs attention bell beside it; the menu's panel spans the whole row. */
+.account-row { position: relative; display: flex; align-items: center; gap: .3rem; }
+.account-row .menu { position: static; flex: 1; min-width: 0; }
+.bell { position: relative; flex: none; display: grid; place-items: center; width: 2.6rem; height: 2.6rem; border-radius: var(--radius);
+        border: 1px solid transparent; color: var(--muted); text-decoration: none; transition: background .15s, color .15s, border-color .15s; }
+.bell:hover { background: var(--sunken); border-color: var(--line); color: var(--text); }
+.bell.has-alerts { color: var(--text-2); }
+.bell.active { background: var(--brand-50); border-color: transparent; color: var(--brand-700); }
+.bell .icon { width: 1.3rem; height: 1.3rem; }
+.bell .nav-badge { position: absolute; inset-block-start: .15rem; inset-inline-end: .15rem; margin: 0; min-width: 1.1rem; height: 1.1rem;
+                   padding-inline: .25rem; font-size: .62rem; box-shadow: 0 0 0 2px var(--surface); }
 
 /* User menu (a <details>, so it works without JS) */
 .menu { position: relative; }
@@ -219,7 +230,7 @@ kbd { font: 600 .72rem/1 "Plex", ui-monospace, monospace; padding: .18rem .38rem
 /*
  * Collapsing the sidebar (computers only): the round button on its edge turns it into a rail of
  * icons. In the rail, each label becomes a tooltip beside its icon (still read out by screen readers),
- * the badge sits on the bell, and the account menu opens to the side.
+ * the Needs attention bell sits above the avatar, and the account menu opens to the side.
  */
 .side-toggle { position: absolute; inset-inline-end: -13px; inset-block-start: 1.55rem; z-index: 2; display: grid; place-items: center;
                width: 26px; height: 26px; min-height: 0; padding: 0; border-radius: 50%; border: 1px solid var(--line-strong);
@@ -251,11 +262,10 @@ kbd { font: 600 .72rem/1 "Plex", ui-monospace, monospace; padding: .18rem .38rem
     :root[data-sidebar="collapsed"] .side-nav a:hover > span:not(.nav-badge),
     :root[data-sidebar="collapsed"] .side-nav a:focus-visible > span:not(.nav-badge) { opacity: 1; translate: 0 -50%;
                                                                                         transition: opacity .12s, translate .12s; }
-    :root[data-sidebar="collapsed"] .nav-badge { position: absolute; inset-block-start: .2rem; inset-inline-end: .45rem; margin: 0;
-                                                 min-width: 1.1rem; height: 1.1rem; padding-inline: .25rem; font-size: .62rem;
-                                                 box-shadow: 0 0 0 2px var(--surface); }
     :root[data-sidebar="collapsed"] .menu > summary { justify-content: center; padding-inline: 0; }
-    :root[data-sidebar="collapsed"] .menu-panel { inset-inline: calc(100% + .6rem) auto; inset-block-end: 0; width: 240px; }
+    :root[data-sidebar="collapsed"] .account-row { flex-direction: column-reverse; gap: .35rem; }
+    :root[data-sidebar="collapsed"] .account-row .menu { flex: none; width: 100%; }
+    :root[data-sidebar="collapsed"] .menu-panel { inset-inline: calc(100% + 1rem) auto; inset-block-end: 0; width: 240px; }
 }
 
 .content { min-width: 0; display: flex; flex-direction: column; }
@@ -504,11 +514,6 @@ dialog.modal.calm .modal-icon { background: var(--brand-50); color: var(--brand-
 .empty p { margin: 0 0 .4rem; font-size: .86rem; max-width: 30ch; }
 
 /* ---------- Week grid ---------- */
-.tabs { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; margin-block-end: 1.25rem; border-radius: 11px;
-        background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-1); }
-.tabs a { padding: .4rem .85rem; border-radius: 8px; text-decoration: none; color: var(--text-2); font-weight: 500; }
-.tabs a:hover { background: var(--sunken); color: var(--text); }
-.tabs a.active { background: var(--brand-500); color: var(--brand-ink); }
 .week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .6rem; }
 .week .day { padding: .7rem; margin: 0; border-radius: var(--radius); }
 .week .day.today { border-color: var(--brand-500); box-shadow: 0 0 0 1px var(--brand-500), var(--shadow-1); }
@@ -727,13 +732,29 @@ a.block.free:hover .icon { opacity: 1; }
 .section-sub { margin: .1rem 0 0; font-size: .8rem; color: var(--muted); }
 
 /* ---------- Settings ---------- */
-.doctor-cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .6rem; }
-.doctor-card { display: flex; align-items: center; gap: .9rem; padding: .8rem .9rem; border-radius: var(--radius); border: 1px solid var(--line);
+.doctor-cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .6rem; container-type: inline-size; }
+.doctor-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-areas: "avatar main week chevron";
+               align-items: center; gap: .4rem .9rem; padding: .8rem .9rem; border-radius: var(--radius); border: 1px solid var(--line);
                background: var(--surface); text-decoration: none; color: var(--text); transition: border-color .15s, box-shadow .15s; }
 .doctor-card:hover { border-color: var(--brand-500); box-shadow: var(--shadow-2); color: var(--text); }
-.doctor-card .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .2rem; }
-.doctor-card .chevron { color: var(--muted); }
+.doctor-card > .avatar { grid-area: avatar; }
+.doctor-card .grow { grid-area: main; min-width: 0; display: flex; flex-direction: column; gap: .2rem; }
+.doctor-card .mini-week { grid-area: week; }
+.doctor-card .chevron { grid-area: chevron; color: var(--muted); }
+/* A narrow list (a phone, or beside the add form): the week goes under the name instead of squeezing it. */
+@container (max-width: 470px) {
+    .doctor-card { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "avatar main chevron" "avatar week chevron"; }
+    .doctor-card .mini-week { justify-self: start; }
+}
 .doctor-card.inactive { opacity: .65; }
+/* Adding a doctor: the login's fields show once "Add a login" is on. */
+.add-doctor .login-fields { display: none; flex-direction: column; gap: .75rem; padding: .85rem; border-radius: var(--radius);
+                            background: var(--surface-2); border: 1px solid var(--line); }
+.add-doctor:has(input[name=addLogin]:checked) .login-fields { display: flex; }
+/* A doctor's login on their page. */
+.login-who { display: flex; align-items: center; gap: .7rem; margin-block-end: .9rem; }
+.login-who > span:last-child { display: flex; flex-direction: column; line-height: 1.35; }
+.login-switch { margin-block-start: .9rem; padding-block-start: .9rem; border-block-start: 1px solid var(--line); }
 .mini-week { display: flex; gap: 3px; }
 .mini-week span { width: 1.45rem; height: 1.45rem; border-radius: 5px; display: grid; place-items: center; font-size: .62rem; font-weight: 700;
                   background: var(--sunken); color: var(--muted); }
@@ -979,9 +1000,9 @@ a.block.holding { transform: scale(.96); box-shadow: var(--ring); transition: tr
                   min-width: 0; }
     .side-nav a > span:not(.nav-badge) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .side-nav a.active::before { display: none; }
-    .side-nav a .nav-badge { position: absolute; inset-block-start: .1rem; inset-inline-start: calc(50% + .3rem); margin: 0; min-width: 1.1rem;
-                             height: 1.1rem; font-size: .62rem; }
     .side-foot { margin: 0; }
+    .account-row { gap: .1rem; }
+    .bell { order: -1; width: 2.5rem; height: 2.5rem; }
     .menu > summary { padding: .3rem; }
     .menu-who, .menu > summary > .icon { display: none; }
     .menu-panel { inset-inline: auto 0; width: 240px; }

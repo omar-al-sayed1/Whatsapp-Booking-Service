@@ -230,7 +230,8 @@ class OperatorController {
     String addLogin(@PathVariable long id, RedirectAttributes redirect, @RequestParam(defaultValue = "") String username,
                     @RequestParam StaffRole role, @RequestParam String language) {
         clinics.get(id);
-        if (role == StaffRole.OPERATOR) {
+        // Owners and secretaries only: a doctor's login belongs to a doctor, so the clinic makes it on the doctor's page.
+        if (role != StaffRole.OWNER && role != StaffRole.SECRETARY) {
             redirect.addFlashAttribute("error", "error.username");
             return redirectTo(id);
         }

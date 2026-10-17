@@ -52,6 +52,7 @@ class AppointmentController {
         Ctx ctx = context.of(staff, request);
         Appointment appointment = appointments.findByIdAndClinicId(id, ctx.clinicId())
                 .orElseThrow(() -> new NotFoundException("Appointment", id));
+        ctx.requireSees(appointment.getDoctorId(), "Appointment", id);
         Patient patient = appointment.getPatientId() == null ? null
                 : patients.findByIdAndClinicId(appointment.getPatientId(), ctx.clinicId()).orElse(null);
         String doctor = doctors.findByIdAndClinicId(appointment.getDoctorId(), ctx.clinicId())

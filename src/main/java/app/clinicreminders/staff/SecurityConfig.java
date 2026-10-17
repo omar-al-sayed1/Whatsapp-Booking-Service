@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
@@ -21,12 +22,15 @@ import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.savedrequest.RequestCache;
 
 /**
- * Form login for the dashboard. Clinic staff (OWNER, SECRETARY) get the dashboard; operators get
- * {@code /operator}; everyone can change their own password. The WhatsApp webhook and the dev simulator stay open: the webhook is
+ * Form login for the dashboard. Clinic staff get the dashboard: owners and secretaries all of it,
+ * doctors their own day (Today, Week, Patients, their hours; the controllers limit what they see to
+ * their own doctor). Operators get {@code /operator}; everyone can change their own password. The WhatsApp webhook and the dev simulator stay open: the webhook is
  * authenticated by its signature, and the simulator only exists with the fake client.
  */
 @Configuration(proxyBeanMethods = false)
 class SecurityConfig {
+
+    private static final String[] FRONT_DESK = {StaffRole.OWNER.name(), StaffRole.SECRETARY.name()};
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -38,7 +42,12 @@ class SecurityConfig {
                         .requestMatchers("/dev/whatsapp", "/dev/whatsapp/**").permitAll()
                         .requestMatchers("/operator", "/operator/**").hasRole(StaffRole.OPERATOR.name())
                         .requestMatchers("/", "/language", "/account/**").authenticated()
-                        .anyRequest().hasAnyRole(StaffRole.OWNER.name(), StaffRole.SECRETARY.name()))
+                        // The front desk's: clinic settings, the inbox, adding and editing doctors and their
+                        // logins, deleting patients. A doctor may change only their own hours and days off.
+                        .requestMatchers("/settings", "/settings/**", "/attention", "/attention/**").hasAnyRole(FRONT_DESK)
+                        .requestMatchers(HttpMethod.POST, "/doctors", "/doctors/*", "/doctors/*/login", "/doctors/*/login/**",
+                                "/patients/*/delete").hasAnyRole(FRONT_DESK)
+                        .anyRequest().hasAnyRole(StaffRole.OWNER.name(), StaffRole.SECRETARY.name(), StaffRole.DOCTOR.name()))
                 .formLogin(form -> form
                         .loginPage("/login")
                         .successHandler(new LanguageRememberingSuccessHandler())

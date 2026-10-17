@@ -1,10 +1,12 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'settings', ~{::main})}">
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'doctors', ~{::main})}">
 <head><title th:text="${doctor.displayName}">Dr. Khoury</title></head>
 <body>
 <main class="container">
-    <a class="back-link" th:href="@{/settings(tab='doctors')}">
+    <!--/* A doctor on their own page ("My hours") changes hours and days off; the profile and login are the front desk's. */-->
+    <a class="back-link" th:href="@{/doctors}" th:unless="${ownPage}">
         <svg class="icon flip-rtl" aria-hidden="true"><use href="#i-chevron-left"/></svg><span th:text="#{settings.doctors}">Doctors</span></a>
+    <div class="eyebrow" th:if="${ownPage}"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg><span th:text="#{nav.my-hours}">My hours</span></div>
     <header class="page-head">
         <div class="appt-who">
             <span class="avatar lg" th:style="'--hue:' + ${@avatars.hue(doctor.displayName)}" th:text="${@avatars.initials(doctor.displayName)}">DK</span>
@@ -30,8 +32,7 @@
                     <div class="hours-seg" th:each="w : ${day.windows()}" th:title="${w.hours()}"
                          th:style="'inset-inline-start:' + ${w.left()} + '%;width:' + ${w.width()} + '%'">
                         <span th:text="${w.hours()}" dir="auto">9:00 AM – 1:00 PM</span>
-                        <form method="post" th:action="@{/settings/hours/{rule}/delete(rule=${w.id()})}">
-                            <input type="hidden" name="doctorId" th:value="${doctor.id}">
+                        <form method="post" th:action="@{/doctors/{id}/hours/{rule}/delete(id=${doctor.id}, rule=${w.id()})}">
                             <button type="submit" th:title="#{action.delete}" th:aria-label="#{action.delete}">
                                 <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
                         </form>
@@ -43,7 +44,7 @@
                 <div><span>6</span><span>8</span><span>10</span><span>12</span><span>14</span><span>16</span><span>18</span><span>20</span><span>22</span></div>
             </div>
         </div>
-        <form method="post" th:action="@{/settings/doctors/{id}/hours(id=${doctor.id})}" class="inline-form">
+        <form method="post" th:action="@{/doctors/{id}/hours(id=${doctor.id})}" class="inline-form">
             <label><span th:text="#{settings.day}">Day</span>
                 <select name="day">
                     <option th:each="d : ${weekdays}" th:value="${d[0]}" th:text="${d[1]}">Monday</option>
@@ -56,9 +57,10 @@
     </section>
 
     <div class="grid-2">
+        <div class="stack" th:unless="${ownPage}">
         <section class="card">
             <div class="section-head"><h2 th:text="#{settings.profile}">Profile</h2></div>
-            <form method="post" th:action="@{/settings/doctors/{id}(id=${doctor.id})}" class="stack">
+            <form method="post" th:action="@{/doctors/{id}(id=${doctor.id})}" class="stack">
                 <label><span th:text="#{settings.doctor.name}">Name</span>
                     <input type="text" name="displayName" th:value="${doctor.displayName}" required></label>
                 <p class="hint"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
@@ -75,6 +77,64 @@
             </form>
         </section>
 
+        <!--/* The doctor's own login: they see only their appointments and patients, and change their hours. */-->
+        <section class="card">
+            <div class="section-head">
+                <h2 th:text="#{doctor.login}">Login</h2>
+                <span class="chip chip-CANCELLED" th:if="${login != null and !login.enabled}" th:text="#{operator.login.disabled}">Disabled</span>
+            </div>
+            <th:block th:if="${login == null}">
+                <p class="muted" th:text="#{doctor.login.none}">No login yet.</p>
+                <form method="post" th:action="@{/doctors/{id}/login(id=${doctor.id})}" class="stack" autocomplete="off">
+                    <label><span th:text="#{operator.login.username}">Username</span>
+                        <input type="text" name="username" th:value="${draftUsername}" dir="ltr" autocomplete="off"
+                               autocapitalize="none" spellcheck="false" maxlength="40"></label>
+                    <label><span th:text="#{doctor.login.password}">Password</span>
+                        <span class="field-icon">
+                            <svg class="icon" aria-hidden="true"><use href="#i-key"/></svg>
+                            <input type="password" id="doctor-password" name="password" dir="ltr" autocomplete="new-password">
+                            <button type="button" class="reveal" data-reveal="doctor-password" aria-pressed="false" th:aria-label="#{login.show-password}">
+                                <svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></button>
+                        </span>
+                        <span class="hint" th:text="#{doctor.login.password.hint(${minPassword + ''})}">At least 10 characters.</span></label>
+                    <div class="form-actions">
+                        <button type="submit" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-user-check"/></svg>
+                            <span th:text="#{doctor.login.add}">Add a login</span></button>
+                    </div>
+                </form>
+            </th:block>
+            <th:block th:if="${login != null}">
+                <div class="login-who">
+                    <span class="avatar sm" th:style="'--hue:' + ${@avatars.hue(login.username)}" th:text="${@avatars.initials(login.username)}">DK</span>
+                    <span><strong dir="ltr" th:text="${login.username}">dr.khoury</strong>
+                        <span class="muted small" th:text="#{doctor.login.sees}">Sees their own appointments and patients</span></span>
+                </div>
+                <form method="post" th:action="@{/doctors/{id}/login/password(id=${doctor.id})}" class="stack" autocomplete="off"
+                      th:data-confirm="#{doctor.login.password-confirm(${login.username})}" data-confirm-calm>
+                    <label><span th:text="#{password.new}">New password</span>
+                        <span class="field-icon">
+                            <svg class="icon" aria-hidden="true"><use href="#i-key"/></svg>
+                            <input type="password" id="doctor-new-password" name="password" dir="ltr" autocomplete="new-password">
+                            <button type="button" class="reveal" data-reveal="doctor-new-password" aria-pressed="false" th:aria-label="#{login.show-password}">
+                                <svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></button>
+                        </span>
+                        <span class="hint" th:text="#{doctor.login.password.hint(${minPassword + ''})}">At least 10 characters.</span></label>
+                    <div class="form-actions">
+                        <button type="submit"><svg class="icon" aria-hidden="true"><use href="#i-key"/></svg>
+                            <span th:text="#{doctor.login.set-password}">Set the password</span></button>
+                    </div>
+                </form>
+                <form method="post" th:action="@{/doctors/{id}/login/enabled(id=${doctor.id})}" class="login-switch"
+                      th:data-confirm="${login.enabled} ? #{operator.login.disable-confirm(${login.username})} : #{operator.login.enable-confirm(${login.username})}"
+                      th:attr="data-confirm-calm=${login.enabled} ? null : 'calm'">
+                    <input type="hidden" name="enabled" th:value="${!login.enabled}">
+                    <button type="submit" class="sm" th:classappend="${login.enabled} ? 'danger'"
+                            th:text="${login.enabled} ? #{doctor.login.disable} : #{doctor.login.enable}">Disable the login</button>
+                </form>
+            </th:block>
+        </section>
+        </div>
+
         <section class="card">
             <div class="section-head"><h2 th:text="#{settings.days}">Days off and special hours</h2></div>
             <p class="muted" th:if="${daysOff.isEmpty()}" th:text="#{settings.days.none}">None coming up.</p>
@@ -85,14 +145,13 @@
                         <strong th:text="${d.date()}">Friday 25 December 2026</strong><br>
                         <span class="muted small" th:text="${d.hours()} ?: #{settings.days.closed}" dir="auto">Closed all day</span>
                     </span>
-                    <form method="post" th:action="@{/settings/days/{id}/delete(id=${d.id()})}">
-                        <input type="hidden" name="doctorId" th:value="${doctor.id}">
+                    <form method="post" th:action="@{/doctors/{id}/days/{day}/delete(id=${doctor.id}, day=${d.id()})}">
                         <button type="submit" class="sm danger icon-btn" th:title="#{action.delete}" th:aria-label="#{action.delete}">
                             <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button>
                     </form>
                 </li>
             </ul>
-            <form method="post" th:action="@{/settings/doctors/{id}/days(id=${doctor.id})}" class="inline-form">
+            <form method="post" th:action="@{/doctors/{id}/days(id=${doctor.id})}" class="inline-form">
                 <label><span th:text="#{settings.date}">Date</span>
                     <input type="date" name="date" th:min="${today}" required></label>
                 <label class="check"><input type="checkbox" name="closed" value="true" checked>

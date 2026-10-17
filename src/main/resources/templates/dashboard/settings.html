@@ -10,16 +10,8 @@
         </div>
     </header>
 
-    <nav class="tabs" th:aria-label="#{settings.title}">
-        <a th:href="@{/settings}" th:classappend="${tab == 'clinic'} ? 'active'" th:attr="aria-current=${tab == 'clinic'} ? 'page'"
-           th:text="#{settings.clinic}">Clinic</a>
-        <a th:href="@{/settings(tab='doctors')}" th:classappend="${tab == 'doctors'} ? 'active'"
-           th:attr="aria-current=${tab == 'doctors'} ? 'page'">
-            <span th:text="#{settings.doctors}">Doctors</span> <span th:text="'(' + ${doctors.size()} + ')'">(2)</span></a>
-    </nav>
-
     <!--/* One form for the clinic: every field is posted together, so nothing is switched off by accident. */-->
-    <form method="post" th:action="@{/settings/clinic}" th:if="${tab == 'clinic'}">
+    <form method="post" th:action="@{/settings/clinic}">
         <div class="grid-2">
             <div class="stack">
                 <section class="card">
@@ -80,45 +72,6 @@
         </div>
     </form>
 
-    <div class="grid-2" th:if="${tab == 'doctors'}">
-        <section class="card">
-            <div class="section-head"><h2 th:text="#{settings.doctors}">Doctors</h2><span class="count" th:text="${doctors.size()}">2</span></div>
-            <p class="muted" th:if="${doctors.isEmpty()}" th:text="#{today.no-doctors}">No doctors yet.</p>
-            <ul class="doctor-cards">
-                <li th:each="r : ${doctors}">
-                    <a class="doctor-card" th:classappend="${!r.doctor().active} ? 'inactive'"
-                       th:href="@{/settings/doctors/{id}(id=${r.doctor().id})}">
-                        <span class="avatar lg" th:style="'--hue:' + ${@avatars.hue(r.doctor().displayName)}"
-                              th:text="${@avatars.initials(r.doctor().displayName)}">DK</span>
-                        <span class="grow">
-                            <strong th:text="${r.doctor().displayName}">Dr. Khoury</strong>
-                            <span class="tags">
-                                <span class="tag"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
-                                    <span th:text="#{settings.doctor.minutes(${r.doctor().slotMinutes + ''})}">30 min</span></span>
-                                <span class="tag" th:text="${r.doctor().active} ? #{settings.doctor.active} : #{settings.doctor.inactive}">Taking appointments</span>
-                            </span>
-                        </span>
-                        <span class="mini-week" th:aria-label="#{settings.hours}">
-                            <span th:each="w : ${weekdays}" th:classappend="${r.workingDays().contains(w.day())} ? 'on'" th:text="${w.letter()}">M</span>
-                        </span>
-                        <svg class="icon chevron flip-rtl" aria-hidden="true"><use href="#i-chevron-right"/></svg>
-                    </a>
-                </li>
-            </ul>
-        </section>
-        <section class="card">
-            <div class="section-head"><h2 th:text="#{settings.doctor.add}">Add a doctor</h2></div>
-            <form method="post" th:action="@{/settings/doctors}" class="stack">
-                <label><span th:text="#{settings.doctor.name}">Name</span><input type="text" name="displayName" required></label>
-                <p class="hint"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>
-                    <span th:text="#{settings.slot-length.set-by-operator(${slotMinutes + ''})}">Appointments are 20 minutes long.</span></p>
-                <div class="form-actions">
-                    <button type="submit" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
-                        <span th:text="#{action.add}">Add</span></button>
-                </div>
-            </form>
-        </section>
-    </div>
 </main>
 </body>
 </html>

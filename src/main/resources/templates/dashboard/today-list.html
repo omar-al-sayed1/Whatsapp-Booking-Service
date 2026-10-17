@@ -45,8 +45,8 @@
     <div class="card empty" th:if="${doctors.isEmpty()}">
         <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-users"/></svg></span>
         <strong th:text="#{today.no-doctors}">No doctors yet.</strong>
-        <a class="button primary sm" th:href="@{/settings}"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg>
-            <span th:text="#{nav.settings}">Settings</span></a>
+        <a class="button primary sm" th:href="@{/doctors}"><svg class="icon" aria-hidden="true"><use href="#i-stethoscope"/></svg>
+            <span th:text="#{nav.doctors}">Doctors</span></a>
     </div>
 
     <div class="doctors">
