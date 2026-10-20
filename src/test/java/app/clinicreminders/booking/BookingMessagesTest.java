@@ -9,7 +9,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import app.clinicreminders.booking.BookingMessages.Upcoming;
 import app.clinicreminders.common.Language;
+import app.clinicreminders.patient.Patient;
 import app.clinicreminders.scheduling.Doctor;
 import app.clinicreminders.whatsapp.OutboundMessage.ListMessage;
 import app.clinicreminders.whatsapp.OutboundMessage.ListRow;
@@ -111,23 +113,63 @@ class BookingMessagesTest {
     }
 
     @Test
-    void confirmationAndBooked() {
-        ReplyButtonsMessage confirm = messages.confirm(TO, Language.AR, "د. خوري", TUE_1030, BEIRUT);
+    void aNewNumberConfirmsUnderItsWhatsAppNameOrForSomeoneElse() {
+        ListMessage confirm = messages.confirm(TO, Language.AR, "د. خوري", TUE_1030, BEIRUT, List.of(), "Rana");
 
-        assertThat(confirm.body()).isEqualTo("هل نحجز لك موعدًا مع د. خوري يوم الثلاثاء 3 تشرين الثاني الساعة 10:30 ص؟");
-        assertThat(confirm.buttons()).containsExactly(new ReplyButton("confirm:yes", "تأكيد"),
-                new ReplyButton("confirm:other", "وقت آخر"), new ReplyButton("confirm:cancel", "إلغاء"));
-        assertThat(messages.booked(TO, Language.EN, "Dr. Khoury", TUE_1030, BEIRUT).body())
-                .isEqualTo("Booked: Dr. Khoury on Tuesday 3 November at 10:30 AM. To cancel, message us and tap My appointment.");
+        assertThat(confirm.body()).isEqualTo("موعد مع د. خوري يوم الثلاثاء 3 تشرين الثاني الساعة 10:30 ص.\nلمن هذا الموعد؟");
+        assertThat(confirm.rows()).containsExactly(new ListRow("confirm:me", "Rana", "أنا"),
+                new ListRow("confirm:new", "شخص آخر", "اكتب اسمه"), new ListRow("confirm:other", "وقت آخر", null),
+                new ListRow("confirm:cancel", "لا أريد الحجز", null));
+        assertThat(messages.confirm(TO, Language.EN, "Dr. Khoury", TUE_1030, BEIRUT, List.of(), null).rows().getFirst())
+                .as("no WhatsApp name").isEqualTo(new ListRow("confirm:me", "Me", null));
     }
 
     @Test
-    void myAppointmentCarriesTheAppointmentId() {
-        ReplyButtonsMessage mine = messages.myAppointment(TO, Language.EN, "Dr. Khoury", TUE_1030, BEIRUT, 45);
+    void aKnownNumberConfirmsForOneOfItsPatients() {
+        ListMessage confirm = messages.confirm(TO, Language.EN, "Dr. Khoury", TUE_1030, BEIRUT,
+                List.of(patient(7, "Mira Haddad"), patient(8, "Karim Abdel-Massih Haddad")), "Mira");
+
+        assertThat(confirm.body()).isEqualTo("Dr. Khoury on Tuesday 3 November at 10:30 AM.\nWho is this appointment for?");
+        assertThat(confirm.button()).isEqualTo("Choose");
+        assertThat(confirm.rows()).extracting(ListRow::id)
+                .containsExactly("confirm:patient:7", "confirm:patient:8", "confirm:new", "confirm:other", "confirm:cancel");
+        assertThat(confirm.rows().get(1).title()).isEqualTo("Karim Abdel-Massih Hadd…");
+    }
+
+    @Test
+    void bookedNamesThePatient() {
+        assertThat(messages.booked(TO, Language.EN, "Karim", "Dr. Khoury", TUE_1030, BEIRUT).body())
+                .isEqualTo("Booked for Karim: Dr. Khoury on Tuesday 3 November at 10:30 AM. To cancel, message us and tap My appointment.");
+        assertThat(messages.askName(TO, Language.EN).body()).isEqualTo("What is the patient's full name? Please type it.");
+    }
+
+    @Test
+    void myAppointmentCarriesTheAppointmentIdAndNamesAFamilysPatient() {
+        ReplyButtonsMessage mine = messages.myAppointment(TO, Language.EN, new Upcoming(45, null, "Dr. Khoury", TUE_1030), BEIRUT);
 
         assertThat(mine.body()).isEqualTo("Your next appointment: Dr. Khoury on Tuesday 3 November at 10:30 AM.");
         assertThat(mine.buttons()).containsExactly(new ReplyButton("mine:cancel:45", "Cancel it"),
                 new ReplyButton("mine:keep", "Keep it"));
+        assertThat(messages.myAppointment(TO, Language.EN, new Upcoming(45, "Karim", "Dr. Khoury", TUE_1030), BEIRUT).body())
+                .isEqualTo("Next appointment for Karim: Dr. Khoury on Tuesday 3 November at 10:30 AM.");
+    }
+
+    @Test
+    void severalAppointmentsComeAsAList() {
+        ListMessage list = messages.myAppointments(TO, Language.EN, List.of(
+                new Upcoming(45, "Karim", "Dr. Khoury", TUE_1030),
+                new Upcoming(46, "Mira", "Dr. Saab", TUE_1030.plusSeconds(86_400))), BEIRUT);
+
+        assertThat(list.body()).isEqualTo("Your upcoming appointments. Choose one to see or cancel it.");
+        assertThat(list.rows()).containsExactly(
+                new ListRow("mine:show:45", "Tuesday 3 November", "10:30 AM · Dr. Khoury · Karim"),
+                new ListRow("mine:show:46", "Wednesday 4 November", "10:30 AM · Dr. Saab · Mira"));
+    }
+
+    private static Patient patient(long id, String name) {
+        Patient patient = new Patient(1, name, TO, Language.EN);
+        ReflectionTestUtils.setField(patient, "id", id);
+        return patient;
     }
 
     @Test

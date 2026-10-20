@@ -73,6 +73,8 @@
                     <summary th:aria-label="#{nav.menu}">
                         <span class="avatar sm" th:style="'--hue:' + ${@avatars.hue(staff.username)}"
                               th:text="${@avatars.initials(staff.username)}">OM</span>
+                        <!--/* Phones: Needs attention is inside this menu, so a dot on the avatar says something waits. */-->
+                        <span class="avatar-alert" aria-hidden="true" th:if="${attentionCount != null and attentionCount > 0}"></span>
                         <span class="menu-who">
                             <strong th:text="${staff.username}">owner</strong>
                             <span th:text="#{'role.' + ${staff.role().name()}}">Owner</span>
@@ -80,6 +82,14 @@
                         <svg class="icon" aria-hidden="true"><use href="#i-chevron-up"/></svg>
                     </summary>
                     <div class="menu-panel">
+                        <!--/* Phones only (CSS): the bell beside the menu takes its place on computers. */-->
+                        <th:block th:if="${staff.clinicId() != null and staff.doctorId() == null}">
+                            <a class="menu-attention" th:href="@{/attention}" th:classappend="${active == 'attention'} ? 'active'"
+                               th:attr="aria-current=${active == 'attention'} ? 'page'">
+                                <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg><span th:text="#{nav.attention}">Needs attention</span>
+                                <span class="nav-badge" th:if="${attentionCount != null and attentionCount > 0}" th:text="${attentionCount}">2</span></a>
+                            <hr class="menu-attention-rule">
+                        </th:block>
                         <div class="menu-title" th:text="#{theme.title}">Theme</div>
                         <div class="theme-switch" role="group" th:aria-label="#{theme.title}">
                             <button type="button" data-theme-choice="auto" aria-pressed="true">
@@ -117,6 +127,8 @@
 
     <div class="content">
         <main th:replace="${content}">content</main>
+        <!--/* Shown at once while another page opens (app.js); that page then replaces all of this. */-->
+        <div class="page-skeleton" th:insert="~{dashboard/skeletons :: page}"></div>
     </div>
 </div>
 
@@ -145,6 +157,8 @@
     </div>
     <div id="drawer-body" class="drawer-body"></div>
 </dialog>
+<!--/* What the slide-over shows while its form loads (app.js). */-->
+<template id="drawer-skeleton"><div th:replace="~{dashboard/skeletons :: form}"></div></template>
 
 <dialog id="confirm-dialog" class="modal">
     <form method="dialog">

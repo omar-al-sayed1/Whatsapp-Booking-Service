@@ -1,6 +1,7 @@
 package app.clinicreminders.patient;
 
 import java.time.Instant;
+import java.util.Locale;
 
 import app.clinicreminders.common.Language;
 import jakarta.persistence.Column;
@@ -14,6 +15,9 @@ import org.hibernate.annotations.Generated;
 /**
  * Privacy: name, phone, WhatsApp user id, language and opt-out only. Never add medical notes,
  * diagnoses or reasons for visit.
+ *
+ * <p>Several patients may share a phone (a parent and their children), each under their own name;
+ * no two of a clinic share both. Opting out is the number's: every patient on it is opted out.
  */
 @Entity
 @Table(name = "patient")
@@ -49,7 +53,7 @@ public class Patient {
 
     public Patient(long clinicId, String name, String phoneE164, Language language) {
         this.clinicId = clinicId;
-        this.name = name;
+        this.name = normalizeName(name);
         this.phoneE164 = phoneE164;
         this.language = language;
     }
@@ -57,6 +61,20 @@ public class Patient {
     /** Replied STOP: never message this patient again. */
     public void optOut() {
         this.optedOut = true;
+    }
+
+    /** Whether this is the patient called {@code name}: any case, extra spaces ignored. */
+    public boolean hasName(String name) {
+        return nameKey(this.name).equals(nameKey(name));
+    }
+
+    /** A name as stored: trimmed, with single spaces. */
+    public static String normalizeName(String name) {
+        return name.strip().replaceAll("\\s+", " ");
+    }
+
+    private static String nameKey(String name) {
+        return normalizeName(name).toLowerCase(Locale.ROOT);
     }
 
     /** Meta regenerates the id when the user changes number, so the latest one wins. */

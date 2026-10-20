@@ -26,6 +26,11 @@ public class ReminderMessages {
     public static final String H24_TEMPLATE = "appointment_reminder";
     /** "Hello {{1}}, your appointment with {{2}} is today at {{3}}." */
     public static final String H2_TEMPLATE = "appointment_reminder_soon";
+    /**
+     * "Hello {{1}}, we're sorry: your appointment with {{2}} on {{3}} at {{4}} is cancelled because the
+     * doctor is not available then." One quick reply, Book another time, which starts a booking.
+     */
+    public static final String DOCTOR_AWAY_TEMPLATE = "appointment_cancelled_by_clinic";
 
     private final MessageSource messages;
     private final ReminderProperties properties;
@@ -45,6 +50,14 @@ public class ReminderMessages {
             case H2 -> new TemplateMessage(patient.getPhoneE164(), H2_TEMPLATE, code,
                     List.of(patient.getName(), doctor.getDisplayName(), time(local, language)));
         };
+    }
+
+    /** Sent when the clinic cancels because the doctor won't be there; the patient may not have written lately. */
+    public TemplateMessage doctorAway(Patient patient, Doctor doctor, Instant startsAt, ZoneId zone) {
+        Language language = patient.getLanguage();
+        ZonedDateTime local = startsAt.atZone(zone);
+        return new TemplateMessage(patient.getPhoneE164(), DOCTOR_AWAY_TEMPLATE, properties.templateLanguageCode(language),
+                List.of(patient.getName(), doctor.getDisplayName(), date(local, language), time(local, language)));
     }
 
     /** Sent after the patient taps Cancel. */

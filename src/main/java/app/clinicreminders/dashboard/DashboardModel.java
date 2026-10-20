@@ -48,9 +48,9 @@ class DashboardModel {
             if (staff.doctorId() != null) {
                 return; // Needs attention is the front desk's
             }
-            model.addAttribute("attentionCount",
-                    conversations.findByClinicIdAndNeedsHumanTrueOrderByUpdatedAtDesc(clinicId).size()
-                            + logs.findFailedSince(clinicId, clock.instant().minus(AttentionController.FAILED_SENDS_WINDOW)).size());
+            // Counted in the database: this runs on every page.
+            model.addAttribute("attentionCount", conversations.countByClinicIdAndNeedsHumanTrue(clinicId)
+                    + logs.countFailedSince(clinicId, clock.instant().minus(AttentionController.FAILED_SENDS_WINDOW)));
         }
     }
 

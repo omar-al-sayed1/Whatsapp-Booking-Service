@@ -128,7 +128,7 @@ class BookingFlowIT extends IntegrationTest {
                 menu -> assertThat(menu.body()).isEqualTo("Hello! How can we help?"));
         assertThat(state()).isEqualTo(ConversationState.MENU);
         assertThat(flagged()).isFalse();
-        assertThat(patients.findByClinicIdAndPhoneE164(clinic.getId(), PHONE)).as("no patient until they book").isEmpty();
+        assertThat(patients.findByClinicIdAndPhoneE164OrderById(clinic.getId(), PHONE)).as("no patient until they book").isEmpty();
     }
 
     @Test
@@ -163,12 +163,15 @@ class BookingFlowIT extends IntegrationTest {
 
         tap(slot(THU_1030));
         assertThat(state()).isEqualTo(ConversationState.CONFIRM);
-        assertThat(lastTo(PHONE)).isInstanceOfSatisfying(ReplyButtonsMessage.class, confirm -> assertThat(confirm.body())
-                .isEqualTo("هل نحجز لك موعدًا مع د. خوري يوم الخميس 15 تشرين الأول الساعة 10:30 ص؟"));
+        assertThat(lastTo(PHONE)).isInstanceOfSatisfying(ListMessage.class, confirm -> {
+            assertThat(confirm.body()).isEqualTo("موعد مع د. خوري يوم الخميس 15 تشرين الأول الساعة 10:30 ص.\nلمن هذا الموعد؟");
+            assertThat(confirm.rows()).extracting(ListRow::id)
+                    .containsExactly("confirm:me", "confirm:new", "confirm:other", "confirm:cancel");
+        });
 
-        tap("confirm:yes");
+        tap("confirm:me");
 
-        Patient rana = patients.findByClinicIdAndPhoneE164(clinic.getId(), PHONE).orElseThrow();
+        Patient rana = patients.findByClinicIdAndPhoneE164OrderById(clinic.getId(), PHONE).getFirst();
         assertThat(rana.getName()).isEqualTo("Rana");
         assertThat(rana.getLanguage()).isEqualTo(Language.AR);
         Appointment booked = appointments.findNextOpen(clinic.getId(), rana.getId(), clock.instant()).orElseThrow();
@@ -179,7 +182,7 @@ class BookingFlowIT extends IntegrationTest {
 
         SentMessage done = lastSentTo(PHONE);
         assertThat(done.message()).isEqualTo(new TextMessage(PHONE,
-                "تم الحجز: د. خوري يوم الخميس 15 تشرين الأول الساعة 10:30 ص. للإلغاء، راسلنا واختر «موعدي»."));
+                "تم الحجز باسم Rana: د. خوري يوم الخميس 15 تشرين الأول الساعة 10:30 ص. للإلغاء، راسلنا واختر «موعدي»."));
         assertThat(logs.findByClinicIdAndWaMessageId(clinic.getId(), done.waMessageId()).orElseThrow().getAppointmentId())
                 .isEqualTo(booked.getId());
         assertThat(whatsApp.recent()).as("menu, days, times, confirmation, booked").hasSize(5);
@@ -251,7 +254,7 @@ class BookingFlowIT extends IntegrationTest {
 
         tapOn(thursdayTimes, slot(THU_0900));
         assertThat(state()).isEqualTo(ConversationState.CONFIRM);
-        tap("confirm:yes");
+        tap("confirm:me");
 
         assertThat(activeAppointmentsAt(THU_0900)).isEqualTo(1);
     }
@@ -262,7 +265,7 @@ class BookingFlowIT extends IntegrationTest {
         SentMessage confirmation = lastSentTo(PHONE);
         tap("confirm:other");
 
-        tapOn(confirmation, "confirm:yes");
+        tapOn(confirmation, "confirm:me");
 
         assertThat(state()).isEqualTo(ConversationState.CHOOSE_SLOT);
         assertThat(rowIds(lastTo(PHONE))).contains(slot(THU_1030));
@@ -274,8 +277,8 @@ class BookingFlowIT extends IntegrationTest {
         reachConfirmation(PHONE);
         SentMessage confirmation = lastSentTo(PHONE);
 
-        tapOn(confirmation, "confirm:yes");
-        tapOn(confirmation, "confirm:yes");
+        tapOn(confirmation, "confirm:me");
+        tapOn(confirmation, "confirm:me");
 
         assertThat(activeAppointmentsAt(THU_1030)).isEqualTo(1);
         assertThat(whatsApp.recent()).hasSize(5);
@@ -287,14 +290,14 @@ class BookingFlowIT extends IntegrationTest {
         Patient walkIn = data.patient(clinic, OTHER_PHONE);
         appointmentService.book(clinic.getId(), khoury.getId(), walkIn.getId(), THU_1030, AppointmentSource.MANUAL);
 
-        tap("confirm:yes");
+        tap("confirm:me");
 
         assertThat(lastTo(PHONE)).isInstanceOfSatisfying(ListMessage.class, times -> {
             assertThat(times.body()).isEqualTo(TAKEN_AR);
             assertThat(times.rows()).extracting(ListRow::id).hasSize(5).doesNotContain(slot(THU_1030));
         });
         assertThat(state()).isEqualTo(ConversationState.CHOOSE_SLOT);
-        assertThat(patients.findByClinicIdAndPhoneE164(clinic.getId(), PHONE)).isEmpty();
+        assertThat(patients.findByClinicIdAndPhoneE164OrderById(clinic.getId(), PHONE)).isEmpty();
     }
 
     @Test
@@ -346,6 +349,133 @@ class BookingFlowIT extends IntegrationTest {
         tap("menu:book");
 
         assertThat(lastTo(PHONE)).isEqualTo(new TextMessage(PHONE, "الحجز عبر واتساب غير متاح حاليًا. سنتصل بك."));
+        assertThat(flagged()).isTrue();
+    }
+
+    // --- Families: one number, several patients ---
+
+    @Test
+    void aFamilyPicksWhoTheAppointmentIsFor() {
+        Patient mira = data.patient(clinic, "Mira", PHONE, Language.AR);
+        Patient karim = data.patient(clinic, "Karim", PHONE, Language.AR);
+        reachConfirmation(PHONE);
+        assertThat(rowIds(lastTo(PHONE))).as("no WhatsApp name: the number has its patients")
+                .containsExactly("confirm:patient:" + mira.getId(), "confirm:patient:" + karim.getId(), "confirm:new",
+                        "confirm:other", "confirm:cancel");
+
+        tap("confirm:patient:" + karim.getId());
+
+        Appointment booked = appointments.findNextOpen(clinic.getId(), karim.getId(), clock.instant()).orElseThrow();
+        assertThat(booked.getStartsAt()).isEqualTo(THU_1030);
+        assertThat(lastTo(PHONE)).isInstanceOfSatisfying(TextMessage.class,
+                done -> assertThat(done.body()).startsWith("تم الحجز باسم Karim: د. خوري"));
+        assertThat(appointments.findNextOpen(clinic.getId(), mira.getId(), clock.instant())).isEmpty();
+    }
+
+    @Test
+    void someoneElseTypesTheirNameAndJoinsTheNumbersFamily() {
+        Patient mira = data.patient(clinic, "Mira", PHONE, Language.AR);
+        reachConfirmation(PHONE);
+
+        tap("confirm:new");
+        assertThat(state()).isEqualTo(ConversationState.ENTER_NAME);
+        assertThat(lastTo(PHONE)).isEqualTo(new TextMessage(PHONE, "ما الاسم الكامل للمريض؟ اكتبه من فضلك."));
+
+        say("  Lina   Haddad ");
+
+        List<Patient> family = patients.findByClinicIdAndPhoneE164OrderById(clinic.getId(), PHONE);
+        assertThat(family).extracting(Patient::getName).containsExactly("Mira", "Lina Haddad");
+        Patient lina = family.get(1);
+        assertThat(lina.getLanguage()).isEqualTo(Language.AR);
+        assertThat(appointments.findNextOpen(clinic.getId(), lina.getId(), clock.instant()).orElseThrow().getStartsAt())
+                .isEqualTo(THU_1030);
+        assertThat(lastTo(PHONE)).isInstanceOfSatisfying(TextMessage.class,
+                done -> assertThat(done.body()).startsWith("تم الحجز باسم Lina Haddad:"));
+        assertThat(whatsApp.recent()).as("menu, days, times, who, name question, booked").hasSize(6);
+        assertThat(appointments.findNextOpen(clinic.getId(), mira.getId(), clock.instant())).isEmpty();
+        assertThat(flagged()).isFalse();
+    }
+
+    @Test
+    void aNameAlreadyOnTheNumberIsThatPatient() {
+        Patient mira = data.patient(clinic, "Mira Haddad", PHONE, Language.AR);
+        reachConfirmation(PHONE);
+        tap("confirm:new");
+
+        say("mira haddad");
+
+        assertThat(patients.findByClinicIdAndPhoneE164OrderById(clinic.getId(), PHONE)).hasSize(1);
+        assertThat(appointments.findNextOpen(clinic.getId(), mira.getId(), clock.instant())).isPresent();
+    }
+
+    @Test
+    void whileWaitingForTheNameTheChoiceCanStillChange() {
+        reachConfirmation(PHONE);
+        SentMessage who = lastSentTo(PHONE);
+        tap("confirm:new");
+
+        tapOn(who, "confirm:me");
+
+        assertThat(activeAppointmentsAt(THU_1030)).isEqualTo(1);
+        assertThat(patients.findByClinicIdAndPhoneE164OrderById(clinic.getId(), PHONE)).extracting(Patient::getName)
+                .as("for them after all, under their WhatsApp name").containsExactly("Rana");
+    }
+
+    @Test
+    void anythingButANameGetsTheMenuOnceAndFlagsTheConversation() {
+        reachConfirmation(PHONE);
+        tap("confirm:new");
+
+        say("😊");
+
+        assertThat(lastTo(PHONE)).isInstanceOfSatisfying(ReplyButtonsMessage.class,
+                menu -> assertThat(menu.body()).isEqualTo(MENU_AR));
+        assertThat(flagged()).isTrue();
+        assertThat(activeAppointmentsAt(THU_1030)).isZero();
+    }
+
+    @Test
+    void myAppointmentListsTheWholeFamilysAndCancelsTheOnePicked() {
+        Patient mira = data.patient(clinic, "Mira", PHONE, Language.AR);
+        Patient karim = data.patient(clinic, "Karim", PHONE, Language.AR);
+        Appointment miras = appointmentService.book(clinic.getId(), khoury.getId(), mira.getId(), THU_1030,
+                AppointmentSource.MANUAL);
+        Appointment karims = appointmentService.book(clinic.getId(), khoury.getId(), karim.getId(), THU_0900,
+                AppointmentSource.MANUAL);
+        say("مرحبا");
+
+        tap("menu:mine");
+        assertThat(state()).isEqualTo(ConversationState.MY_APPOINTMENT);
+        assertThat(lastTo(PHONE)).isInstanceOfSatisfying(ListMessage.class, list -> {
+            assertThat(list.rows()).extracting(ListRow::id).as("earliest first")
+                    .containsExactly("mine:show:" + karims.getId(), "mine:show:" + miras.getId());
+            assertThat(list.rows().getFirst().description()).isEqualTo("9:00 ص · د. خوري · Karim");
+        });
+
+        tap("mine:show:" + miras.getId());
+        assertThat(lastTo(PHONE)).isInstanceOfSatisfying(ReplyButtonsMessage.class, mine -> {
+            assertThat(mine.body()).isEqualTo("الموعد القادم باسم Mira: د. خوري يوم الخميس 15 تشرين الأول الساعة 10:30 ص.");
+            assertThat(mine.buttons()).extracting(ReplyButton::id).containsExactly("mine:cancel:" + miras.getId(), "mine:keep");
+        });
+
+        tap("mine:cancel:" + miras.getId());
+
+        assertThat(appointments.findByIdAndClinicId(miras.getId(), clinic.getId()).orElseThrow().getStatus())
+                .isEqualTo(AppointmentStatus.CANCELLED);
+        assertThat(appointments.findByIdAndClinicId(karims.getId(), clinic.getId()).orElseThrow().getStatus())
+                .isEqualTo(AppointmentStatus.BOOKED);
+    }
+
+    @Test
+    void oneOptedOutFamilyMemberMeansTheNumberGetsNoReply() {
+        data.patient(clinic, "Mira", PHONE, Language.AR);
+        Patient karim = data.patient(clinic, "Karim", PHONE, Language.AR);
+        karim.optOut();
+        patients.save(karim);
+
+        say("مرحبا");
+
+        assertThat(whatsApp.recent()).isEmpty();
         assertThat(flagged()).isTrue();
     }
 
@@ -473,7 +603,7 @@ class BookingFlowIT extends IntegrationTest {
     @Test
     void thanksAfterABookingIsIgnoredUntilTheSessionEnds() {
         reachConfirmation(PHONE);
-        tap("confirm:yes");
+        tap("confirm:me");
 
         say("شكراً");
         assertThat(whatsApp.recent()).hasSize(5);
@@ -536,8 +666,8 @@ class BookingFlowIT extends IntegrationTest {
     void twoPatientsConfirmingTheSameTimeTogetherGetOneBooking() throws Exception {
         reachConfirmation(PHONE);
         reachConfirmation(OTHER_PHONE);
-        storeTap(PHONE, lastSentTo(PHONE), "confirm:yes", "تأكيد");
-        storeTap(OTHER_PHONE, lastSentTo(OTHER_PHONE), "confirm:yes", "تأكيد");
+        storeTap(PHONE, lastSentTo(PHONE), "confirm:me", "Rana");
+        storeTap(OTHER_PHONE, lastSentTo(OTHER_PHONE), "confirm:me", "Rana");
 
         CyclicBarrier start = new CyclicBarrier(2);
         Callable<Integer> drain = () -> {
@@ -579,7 +709,7 @@ class BookingFlowIT extends IntegrationTest {
         }));
         assertThat(inserted.await(10, SECONDS)).isTrue();
 
-        tap("confirm:yes");
+        tap("confirm:me");
         secretary.get(10, SECONDS);
 
         assertThat(lastTo(PHONE)).isInstanceOfSatisfying(ListMessage.class,
@@ -634,7 +764,7 @@ class BookingFlowIT extends IntegrationTest {
         tap(phone, "menu:book");
         tap(phone, "day:2026-10-15");
         tap(phone, slot(THU_1030));
-        assertThat(lastTo(phone)).isInstanceOf(ReplyButtonsMessage.class);
+        assertThat(lastTo(phone)).isInstanceOf(ListMessage.class);
     }
 
     private void say(String text) {

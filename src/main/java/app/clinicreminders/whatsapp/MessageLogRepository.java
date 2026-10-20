@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +28,16 @@ public interface MessageLogRepository extends Repository<MessageLog, Long> {
               and m.status = app.clinicreminders.whatsapp.MessageStatus.FAILED
               and m.createdAt >= :since
             order by m.createdAt desc, m.id desc""")
-    List<FailedSend> findFailedSince(Long clinicId, Instant since);
+    List<FailedSend> findFailedSince(Long clinicId, Instant since, Pageable page);
+
+    /** How many {@link #findFailedSince} finds in all: the Needs attention count. */
+    @Query("""
+            select count(m) from MessageLog m
+            where m.clinicId = :clinicId
+              and m.direction = app.clinicreminders.whatsapp.MessageDirection.OUT
+              and m.status = app.clinicreminders.whatsapp.MessageStatus.FAILED
+              and m.createdAt >= :since""")
+    long countFailedSince(Long clinicId, Instant since);
 
     /**
      * Records an inbound message unless its WhatsApp id was seen before; this is how duplicate

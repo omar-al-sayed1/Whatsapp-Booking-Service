@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 
 import app.clinicreminders.appointment.Appointment;
 import app.clinicreminders.appointment.AppointmentRepository;
@@ -132,7 +133,7 @@ class AppointmentFormIT extends DashboardTest {
         assertThat(book("09:30", "", "70 123 456", "Karim", "en"))
                 .hasStatus3xxRedirection().headers().hasValue("Location", "/?date=" + DATE);
 
-        Patient karim = patients.findByClinicIdAndPhoneE164(clinic.getId(), "+96170123456").orElseThrow();
+        Patient karim = patients.findByClinicIdAndPhoneE164OrderById(clinic.getId(), "+96170123456").getFirst();
         assertThat(karim.getName()).isEqualTo("Karim");
         assertThat(karim.getLanguage()).isEqualTo(Language.EN);
         Appointment appointment = onlyAppointment();
@@ -147,9 +148,49 @@ class AppointmentFormIT extends DashboardTest {
 
         book("09:00", "", "+961 70 123 456", "", "en");
 
-        assertThat(patients.findByClinicIdAndPhoneE164(clinic.getId(), "+96170123456").orElseThrow().getName())
+        assertThat(patients.findByClinicIdAndPhoneE164OrderById(clinic.getId(), "+96170123456").getFirst().getName())
                 .isEqualTo("Rana");
         assertThat(onlyAppointment().getStartsAt()).isEqualTo(NINE);
+    }
+
+    @Test
+    void aNewNameOnAKnownNumberAddsAFamilyMember() {
+        Patient rana = data.patient(clinic, "Rana", "+96170123456", Language.AR);
+
+        assertThat(book("09:00", "", "70 123 456", "Karim", "en")).hasStatus3xxRedirection();
+
+        List<Patient> family = patients.findByClinicIdAndPhoneE164OrderById(clinic.getId(), "+96170123456");
+        assertThat(family).extracting(Patient::getName).containsExactly("Rana", "Karim");
+        assertThat(family.get(1).getLanguage()).isEqualTo(Language.EN);
+        assertThat(onlyAppointment().getPatientId()).isEqualTo(family.get(1).getId()).isNotEqualTo(rana.getId());
+    }
+
+    @Test
+    void aNumberSharedByAFamilyNeedsTheName() {
+        data.patient(clinic, "Rana", "+96170123456", Language.AR);
+        Patient karim = data.patient(clinic, "Karim", "+96170123456", Language.AR);
+
+        assertThat(book("09:00", "", "70 123 456", "", "ar")).hasStatusOk().bodyText()
+                .contains("Several patients share this number: type or pick the name.");
+        assertThat(appointmentCount()).isZero();
+
+        book("09:00", "", "70 123 456", "KARIM", "ar");
+        assertThat(onlyAppointment().getPatientId()).isEqualTo(karim.getId());
+    }
+
+    @Test
+    void theHintOffersTheFamilyOnTheNumber() {
+        data.patient(clinic, "Rana", "+96170123456", Language.AR);
+        data.patient(clinic, "Karim", "+96170123456", Language.EN);
+
+        assertThat(get(staff, "/appointments/patient-hint?phone=70 123 456")).bodyText()
+                .contains("Several patients share this number: pick one, or type a new name.", "On this number:")
+                .contains("data-name=\"Rana\"", "data-name=\"Karim\"", "data-language=\"en\"");
+        assertThat(get(staff, "/appointments/patient-hint?phone=70 123 456&name=rana")).bodyText()
+                .contains("Known patient: Rana", "Also on this number:", "data-name=\"Karim\"")
+                .doesNotContain("data-name=\"Rana\"");
+        assertThat(get(staff, "/appointments/patient-hint?phone=70 123 456&name=Lina")).bodyText()
+                .contains("A new family member on this number.", "data-name=\"Rana\"", "data-name=\"Karim\"");
     }
 
     @Test

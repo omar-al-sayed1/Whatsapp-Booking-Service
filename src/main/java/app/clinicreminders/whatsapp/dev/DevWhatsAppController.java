@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 import app.clinicreminders.clinic.Clinic;
 import app.clinicreminders.clinic.ClinicRepository;
 import app.clinicreminders.common.NotFoundException;
+import app.clinicreminders.reminder.ReminderMessages;
 import app.clinicreminders.whatsapp.FakeWhatsAppClient;
 import app.clinicreminders.whatsapp.FakeWhatsAppClient.SentMessage;
 import app.clinicreminders.whatsapp.MessageLog;
@@ -170,8 +171,11 @@ class DevWhatsAppController {
             case TemplateMessage template -> {
                 kind = "template " + template.name() + " [" + template.languageCode() + "]";
                 content = String.join(" | ", template.bodyParameters());
-                // The approved templates' quick replies (SPEC section 6).
-                quickReplies = template.languageCode().startsWith("ar") ? List.of("تأكيد", "إلغاء") : List.of("Confirm", "Cancel");
+                // The templates' quick replies (SPEC section 6).
+                boolean arabic = template.languageCode().startsWith("ar");
+                quickReplies = template.name().equals(ReminderMessages.DOCTOR_AWAY_TEMPLATE)
+                        ? List.of(arabic ? "احجز موعدًا آخر" : "Book another time")
+                        : arabic ? List.of("تأكيد", "إلغاء") : List.of("Confirm", "Cancel");
             }
             case TextMessage text -> {
                 kind = "text";

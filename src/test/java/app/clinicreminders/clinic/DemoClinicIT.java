@@ -49,7 +49,7 @@ class DemoClinicIT extends IntegrationTest {
         assertThat(clinic.getWaAccessTokenEncrypted()).as("nothing can reach a real number").isNull();
         assertThat(clinic.getAddress()).isNotBlank();
         assertThat(count("doctor", clinic)).isEqualTo(2);
-        assertThat(count("patient", clinic)).isEqualTo(12);
+        assertThat(count("patient", clinic)).isEqualTo(13);
         assertThat(count("appointment", clinic)).isEqualTo(seeded.appointments()).isGreaterThan(80);
 
         Instant now = clock.instant();
@@ -91,7 +91,7 @@ class DemoClinicIT extends IntegrationTest {
         assertThat(second.clinicId()).isEqualTo(first.clinicId());
         Clinic clinic = clinics.findById(second.clinicId()).orElseThrow();
         assertThat(count("doctor", clinic)).isEqualTo(2);
-        assertThat(count("patient", clinic)).isEqualTo(12);
+        assertThat(count("patient", clinic)).isEqualTo(13);
         assertThat(jdbc.queryForObject("select min(starts_at) >= ? from appointment where clinic_id = ?", Boolean.class,
                 clock.instant().minus(Duration.ofDays(15)).atOffset(ZoneOffset.UTC), clinic.getId())).isTrue();
         assertThat(count("appointment", real)).as("a real clinic with the same name is untouched").isEqualTo(1);

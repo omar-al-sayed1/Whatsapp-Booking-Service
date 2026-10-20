@@ -66,10 +66,10 @@ class WhatsAppRepositoriesIT extends IntegrationTest {
 
         assertThat(patients.findByIdAndClinicId(patient.getId(), clinicA.getId())).isPresent();
         assertThat(patients.findByIdAndClinicId(patient.getId(), clinicB.getId())).isEmpty();
-        assertThat(patients.findByClinicIdAndPhoneE164(clinicA.getId(), "+96170123456")).isPresent();
-        assertThat(patients.findByClinicIdAndPhoneE164(clinicB.getId(), "+96170123456")).isEmpty();
-        assertThat(patients.findByClinicIdAndWaUserId(clinicA.getId(), "LB.1")).isPresent();
-        assertThat(patients.findByClinicIdAndWaUserId(clinicB.getId(), "LB.1")).isEmpty();
+        assertThat(patients.findByClinicIdAndPhoneE164OrderById(clinicA.getId(), "+96170123456")).hasSize(1);
+        assertThat(patients.findByClinicIdAndPhoneE164OrderById(clinicB.getId(), "+96170123456")).isEmpty();
+        assertThat(patients.findByClinicIdAndWaUserIdOrderById(clinicA.getId(), "LB.1")).hasSize(1);
+        assertThat(patients.findByClinicIdAndWaUserIdOrderById(clinicB.getId(), "LB.1")).isEmpty();
     }
 
     @Test

@@ -10,6 +10,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import app.clinicreminders.appointment.Appointment;
 import app.clinicreminders.appointment.AppointmentEvents.CancelledBy;
@@ -17,6 +19,7 @@ import app.clinicreminders.appointment.AppointmentRepository;
 import app.clinicreminders.appointment.AppointmentService;
 import app.clinicreminders.appointment.AppointmentSource;
 import app.clinicreminders.appointment.AppointmentStatus;
+import app.clinicreminders.booking.BookingMessages.Upcoming;
 import app.clinicreminders.booking.BookingReplySender.BookingReply;
 import app.clinicreminders.clinic.Clinic;
 import app.clinicreminders.clinic.ClinicRepository;
@@ -25,10 +28,14 @@ import app.clinicreminders.common.NotFoundException;
 import app.clinicreminders.patient.Patient;
 import app.clinicreminders.patient.PatientRepository;
 import app.clinicreminders.patient.PatientService;
+import app.clinicreminders.reminder.ReminderMessages;
 import app.clinicreminders.scheduling.Doctor;
 import app.clinicreminders.scheduling.DoctorRepository;
 import app.clinicreminders.scheduling.Slot;
 import app.clinicreminders.scheduling.SlotService;
+import app.clinicreminders.whatsapp.MessageKind;
+import app.clinicreminders.whatsapp.MessageLog;
+import app.clinicreminders.whatsapp.MessageLogRepository;
 import app.clinicreminders.whatsapp.OutboundMessage;
 import app.clinicreminders.whatsapp.webhook.InboundContent;
 import app.clinicreminders.whatsapp.webhook.InboundContent.ButtonReply;
@@ -50,6 +57,14 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Booking over WhatsApp (SPEC section 5.2): MENU → CHOOSE_DOCTOR (skipped with one doctor) →
  * CHOOSE_DAY → CHOOSE_SLOT → CONFIRM → DONE, plus MY_APPOINTMENT and INFO.
+ *
+ * <p>A number may belong to a family (a parent books for their children), so CONFIRM asks who the
+ * appointment is for: one of the number's patients, or "Someone else", whose name is typed
+ * (ENTER_NAME). A new number can also book under its WhatsApp name. My appointment shows the
+ * appointments of everyone on the number.
+ *
+ * <p>Book another time, on the message telling a patient the doctor is away, starts a booking with
+ * that doctor. Other template buttons (Confirm and Cancel on reminders) are ReminderReplies'.
  *
  * <p>Runs in the webhook inbox's transaction with the conversation row locked, so two quick taps
  * from one patient are handled in order and a failure retries the delivery with nothing applied.
@@ -87,6 +102,10 @@ class BookingFlow {
                         @Nullable Long appointmentId, boolean needsHuman) {
     }
 
+    /** Book another time, tapped after the clinic cancelled: that appointment's doctor and patient. */
+    private record Rebook(long doctorId, @Nullable Long patientId) {
+    }
+
     /** A tap on one of our buttons or list rows: id {@code day:2026-11-03} is kind "day", value "2026-11-03". */
     private record Tap(String kind, String value) {
 
@@ -119,13 +138,14 @@ class BookingFlow {
     private final AppointmentService appointmentService;
     private final SlotService slots;
     private final BookingMessages messages;
+    private final MessageLogRepository logs;
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
     BookingFlow(ConversationRepository conversations, ClinicRepository clinics, PatientRepository patients,
                 PatientService patientService, DoctorRepository doctors, AppointmentRepository appointments,
                 AppointmentService appointmentService, SlotService slots, BookingMessages messages,
-                ApplicationEventPublisher events, Clock clock) {
+                MessageLogRepository logs, ApplicationEventPublisher events, Clock clock) {
         this.conversations = conversations;
         this.clinics = clinics;
         this.patients = patients;
@@ -135,6 +155,7 @@ class BookingFlow {
         this.appointmentService = appointmentService;
         this.slots = slots;
         this.messages = messages;
+        this.logs = logs;
         this.events = events;
         this.clock = clock;
     }
@@ -143,10 +164,11 @@ class BookingFlow {
     @Transactional(propagation = Propagation.MANDATORY)
     void onInbound(InboundMessageReceived event) {
         InboundMessage message = event.message();
-        if (message.content() instanceof QuickReply) {
+        long clinicId = event.clinicId();
+        Rebook rebook = message.content() instanceof QuickReply ? rebookFrom(clinicId, message) : null;
+        if (message.content() instanceof QuickReply && rebook == null) {
             return; // Confirm or Cancel on a reminder template: ReminderReplies handles it.
         }
-        long clinicId = event.clinicId();
         String phone = message.phoneE164();
         if (phone == null) {
             log.info("Clinic {}: message from a WhatsApp user whose number Meta didn't share, not answered", clinicId);
@@ -156,20 +178,28 @@ class BookingFlow {
         // Created already expired, so a new number starts like an idle conversation: at the menu.
         conversations.insertIfAbsent(clinicId, phone, ConversationState.MENU.name(), now);
         Conversation conversation = conversations.findForUpdateByClinicIdAndPatientPhone(clinicId, phone).orElseThrow();
-        Patient patient = event.patientId() == null ? null
-                : patients.findByIdAndClinicId(event.patientId(), clinicId).orElse(null);
-        if (patient != null && patient.isOptedOut()) {
-            log.info("Clinic {}: opted-out patient {} wrote, flagged for the secretary", clinicId, patient.getId());
+        List<Patient> household = patients.findByClinicIdAndPhoneE164OrderById(clinicId, phone);
+        if (household.stream().anyMatch(Patient::isOptedOut)) {
+            log.info("Clinic {}: opted-out patient {} wrote, flagged for the secretary", clinicId, household.getFirst().getId());
             conversation.flagForHuman();
             return;
         }
         Clinic clinic = clinics.findById(clinicId).orElseThrow(() -> new NotFoundException("Clinic", clinicId));
         BookingContext stored = BookingContext.fromJson(conversation.getContextJson());
         boolean fresh = conversation.isExpired(now) || stored.language() == null;
-        BookingContext context = fresh ? BookingContext.start(languageOf(clinic, patient, message.content())) : stored;
+        BookingContext context = fresh ? BookingContext.start(languageOf(clinic, household, message.content())) : stored;
+        if (rebook != null) {
+            // A booking starts again, in the language the cancelled patient's message was in.
+            context = BookingContext.start(household.stream()
+                    .filter(patient -> patient.getId().equals(rebook.patientId()))
+                    .findFirst()
+                    .map(Patient::getLanguage)
+                    .orElse(context.language()));
+        }
 
-        Step step = new Turn(clinic, phone, patient, message, context.language(), now)
-                .answer(fresh ? null : conversation.getState(), context, message.content());
+        Turn turn = new Turn(clinic, phone, household, message, context.language(), now);
+        Step step = rebook != null ? turn.rebook(context, rebook.doctorId())
+                : turn.answer(fresh ? null : conversation.getState(), context, message.content());
 
         if (step.needsHuman()) {
             conversation.flagForHuman();
@@ -180,10 +210,24 @@ class BookingFlow {
         }
     }
 
-    /** An existing patient keeps their language; a new number gets Arabic if they wrote Arabic, else the clinic's. */
-    private static Language languageOf(Clinic clinic, @Nullable Patient patient, InboundContent content) {
-        if (patient != null) {
-            return patient.getLanguage();
+    /** For a tap on Book another time: the appointment the clinic cancelled; else null. */
+    private @Nullable Rebook rebookFrom(long clinicId, InboundMessage message) {
+        if (message.contextMessageId() == null) {
+            return null;
+        }
+        return logs.findByClinicIdAndWaMessageId(clinicId, message.contextMessageId())
+                .filter(sent -> sent.getKind() == MessageKind.TEMPLATE
+                        && ReminderMessages.DOCTOR_AWAY_TEMPLATE.equals(sent.getTemplateName()))
+                .map(MessageLog::getAppointmentId)
+                .flatMap(appointmentId -> appointments.findByIdAndClinicId(appointmentId, clinicId))
+                .map(appointment -> new Rebook(appointment.getDoctorId(), appointment.getPatientId()))
+                .orElse(null);
+    }
+
+    /** A known number keeps its (first) patient's language; a new one gets Arabic if they wrote Arabic, else the clinic's. */
+    private static Language languageOf(Clinic clinic, List<Patient> household, InboundContent content) {
+        if (!household.isEmpty()) {
+            return household.getFirst().getLanguage();
         }
         String written = switch (content) {
             case Text text -> text.body();
@@ -203,18 +247,19 @@ class BookingFlow {
         private final long clinicId;
         private final ZoneId zone;
         private final String phone;
-        private final @Nullable Patient patient;
+        /** The patients on the sender's number: none for a new number, several for a family. */
+        private final List<Patient> household;
         private final InboundMessage message;
         private final Language language;
         private final Instant now;
 
-        Turn(Clinic clinic, String phone, @Nullable Patient patient, InboundMessage message, Language language,
+        Turn(Clinic clinic, String phone, List<Patient> household, InboundMessage message, Language language,
              Instant now) {
             this.clinic = clinic;
             this.clinicId = clinic.getId();
             this.zone = clinic.getTimezone();
             this.phone = phone;
-            this.patient = patient;
+            this.household = household;
             this.message = message;
             this.language = language;
             this.now = now;
@@ -230,17 +275,20 @@ class BookingFlow {
                 return menu(context, false);
             }
             if (tap == null) {
-                return unrecognised(state, context);
+                return state == ConversationState.ENTER_NAME && content instanceof Text text
+                        ? enterName(context, text.body()) : unrecognised(state, context);
             }
             boolean booking = state == ConversationState.CHOOSE_DOCTOR || state == ConversationState.CHOOSE_DAY
-                    || state == ConversationState.CHOOSE_SLOT || state == ConversationState.CONFIRM;
+                    || state == ConversationState.CHOOSE_SLOT || state == ConversationState.CONFIRM
+                    || state == ConversationState.ENTER_NAME;
+            boolean confirming = state == ConversationState.CONFIRM || state == ConversationState.ENTER_NAME;
             return switch (tap.kind()) {
                 case "doctor" -> booking ? chooseDoctor(context, tap.value()) : current(state, context);
                 case "day" -> booking ? chooseDay(context, tap.value()) : current(state, context);
                 case "slot" -> booking ? chooseTime(context, tap.value()) : current(state, context);
                 case "slots" -> state == ConversationState.CHOOSE_SLOT
                         ? times(context.withDay(context.day(), context.page() + 1), false) : current(state, context);
-                case "confirm" -> state == ConversationState.CONFIRM ? confirm(context, tap.value()) : current(state, context);
+                case "confirm" -> confirming ? confirm(context, tap.value()) : current(state, context);
                 case "mine" -> state == ConversationState.MY_APPOINTMENT ? mine(context, tap.value()) : current(state, context);
                 default -> current(state, context);
             };
@@ -254,9 +302,19 @@ class BookingFlow {
                 case CHOOSE_DAY -> days(context, false);
                 case CHOOSE_SLOT -> times(context, false);
                 case CONFIRM -> confirmation(context);
+                case ENTER_NAME -> nameQuestion(context);
                 case MY_APPOINTMENT -> myAppointment(context);
                 case DONE -> new Step(state, context, null, null, false);
             };
+        }
+
+        /** Book another time, after the clinic cancelled: that doctor's free days, or the doctors if they no longer take bookings. */
+        Step rebook(BookingContext context, long doctorId) {
+            boolean bookable = doctors.findByIdAndClinicId(doctorId, clinicId)
+                    .filter(Doctor::isActive)
+                    .filter(doctor -> !doctor.isDeleted())
+                    .isPresent();
+            return bookable ? days(context.withDoctor(doctorId), false) : book(context);
         }
 
         private Step menuChoice(BookingContext context, String choice) {
@@ -371,20 +429,34 @@ class BookingFlow {
             return confirmation(onDay.withSlot(time));
         }
 
+        /** Who the appointment is for: the number's patients, Someone else, Another time or Don't book. */
         private Step confirmation(BookingContext context) {
             if (context.doctorId() == null || context.slot() == null) {
                 return menu(context, false);
             }
             return new Step(ConversationState.CONFIRM, context,
-                    messages.confirm(phone, language, doctorName(context.doctorId()), context.slot(), zone), null, false);
+                    messages.confirm(phone, language, doctorName(context.doctorId()), context.slot(), zone,
+                            household.subList(0, Math.min(household.size(), BookingMessages.MAX_PATIENT_ROWS)),
+                            message.profileName()),
+                    null, false);
         }
 
         private Step confirm(BookingContext context, String answer) {
             if (context.doctorId() == null || context.day() == null || context.slot() == null) {
                 return menu(context, false);
             }
+            if (answer.startsWith("patient:")) {
+                Long patientId = parseLong(answer.substring("patient:".length()));
+                return household.stream()
+                        .filter(patient -> patient.getId().equals(patientId))
+                        .findFirst()
+                        .map(patient -> bookTime(context, () -> patient))
+                        .orElseGet(() -> confirmation(context));
+            }
             return switch (answer) {
-                case "yes" -> bookTime(context, context.doctorId(), context.day(), context.slot());
+                // Offered only while the number has no patient: once it has, its patients are listed instead.
+                case "me" -> household.isEmpty() ? bookTime(context, this::underProfileName) : confirmation(context);
+                case "new" -> nameQuestion(context);
                 case "other" -> times(context.withDay(context.day(), context.page()), false);
                 case "cancel" -> new Step(ConversationState.DONE, context.cleared(),
                         messages.notBooked(phone, language), null, false);
@@ -392,60 +464,102 @@ class BookingFlow {
             };
         }
 
-        private Step bookTime(BookingContext context, long doctorId, LocalDate day, Instant time) {
-            BookingContext sameDay = context.withDay(day, context.page());
-            if (!freeTimes(doctorId, day).contains(time)) {
+        private Step nameQuestion(BookingContext context) {
+            if (context.doctorId() == null || context.slot() == null) {
+                return menu(context, false);
+            }
+            return new Step(ConversationState.ENTER_NAME, context, messages.askName(phone, language), null, false);
+        }
+
+        /**
+         * The name typed after Someone else: books for the number's patient of that name, or adds
+         * them. Anything that isn't a name is treated like other typed text.
+         */
+        private Step enterName(BookingContext context, String typed) {
+            String name = Patient.normalizeName(typed);
+            if (!isName(name)) {
+                return unrecognised(ConversationState.ENTER_NAME, context);
+            }
+            if (context.doctorId() == null || context.day() == null || context.slot() == null) {
+                return menu(context, false);
+            }
+            return bookTime(context, () -> named(name));
+        }
+
+        /** Books the confirmed time for the patient {@code patientFor} gives, asked only once the time is still free. */
+        private Step bookTime(BookingContext context, Supplier<Patient> patientFor) {
+            long doctorId = context.doctorId();
+            Instant time = context.slot();
+            BookingContext sameDay = context.withDay(context.day(), context.page());
+            if (!freeTimes(doctorId, context.day()).contains(time)) {
                 return times(sameDay, true);
             }
-            Optional<Appointment> booked = appointmentService.tryBook(clinicId, doctorId, patientForBooking().getId(),
-                    time, AppointmentSource.WHATSAPP);
+            Patient patient = patientFor.get();
+            Optional<Appointment> booked = appointmentService.tryBook(clinicId, doctorId, patient.getId(), time,
+                    AppointmentSource.WHATSAPP);
             if (booked.isEmpty()) {
                 log.info("Clinic {}: lost the race for doctor {} at {}, offering other times", clinicId, doctorId, time);
                 return times(sameDay, true);
             }
             return new Step(ConversationState.DONE, context.cleared(),
-                    messages.booked(phone, language, doctorName(doctorId), time, zone), booked.get().getId(), false);
+                    messages.booked(phone, language, patient.getName(), doctorName(doctorId), time, zone),
+                    booked.get().getId(), false);
         }
 
-        /** The sender as a patient. A new number becomes one, named after their WhatsApp profile. */
-        private Patient patientForBooking() {
-            if (patient != null) {
-                return patient;
-            }
+        /** A new number's first patient, named after their WhatsApp profile (or their number, without one). */
+        private Patient underProfileName() {
             String profileName = message.profileName();
-            String name = profileName == null || profileName.isBlank() ? phone : profileName;
-            Patient created = patientService.findOrCreate(clinicId, phone, name, language);
-            // No patient of this clinic has the id, or the webhook handler would have matched them.
-            if (message.userId() != null && created.getWaUserId() == null) {
-                created.linkWhatsAppUser(message.userId());
-            }
-            return created;
+            return named(profileName == null || profileName.isBlank() ? phone : profileName);
         }
 
+        /** The patient of this name on the sender's number, or a new one. */
+        private Patient named(String name) {
+            Patient patient = patientService.findOrCreate(clinicId, phone, name, language);
+            // A new patient: the number's others (if any) already got the id from the webhook handler.
+            if (message.userId() != null && patient.getWaUserId() == null) {
+                patient.linkWhatsAppUser(message.userId());
+            }
+            return patient;
+        }
+
+        /** Everyone on the number's appointments to come: one is shown with Cancel it / Keep it, several as a list. */
         private Step myAppointment(BookingContext context) {
-            Optional<Appointment> next = patient == null ? Optional.empty()
-                    : appointments.findNextOpen(clinicId, patient.getId(), now);
-            if (next.isEmpty()) {
+            List<Upcoming> upcoming = upcoming();
+            if (upcoming.isEmpty()) {
                 return menu(context, true);
             }
-            Appointment appointment = next.get();
-            return new Step(ConversationState.MY_APPOINTMENT, context.cleared().withAppointment(appointment.getId()),
-                    messages.myAppointment(phone, language, doctorName(appointment.getDoctorId()),
-                            appointment.getStartsAt(), zone, appointment.getId()),
-                    appointment.getId(), false);
+            if (upcoming.size() == 1) {
+                return showAppointment(context, upcoming.getFirst());
+            }
+            return new Step(ConversationState.MY_APPOINTMENT, context.cleared(),
+                    messages.myAppointments(phone, language, upcoming, zone), null, false);
         }
 
-        /** Cancel it (the acknowledgment is M3's) or Keep it, for the appointment shown. */
+        private Step showAppointment(BookingContext context, Upcoming appointment) {
+            return new Step(ConversationState.MY_APPOINTMENT, context.cleared().withAppointment(appointment.appointmentId()),
+                    messages.myAppointment(phone, language, appointment, zone), appointment.appointmentId(), false);
+        }
+
+        /** Show one from the list, or Cancel it (the acknowledgment is M3's) or Keep it, for the appointment shown. */
         private Step mine(BookingContext context, String value) {
             if (value.equals("keep")) {
                 return new Step(ConversationState.DONE, context.cleared(), null, null, false);
             }
+            if (value.startsWith("show:")) {
+                Long shown = parseLong(value.substring("show:".length()));
+                return upcoming().stream()
+                        .filter(appointment -> shown != null && appointment.appointmentId() == shown)
+                        .findFirst()
+                        .map(appointment -> showAppointment(context, appointment))
+                        .orElseGet(() -> myAppointment(context));
+            }
             Long appointmentId = value.startsWith("cancel:") ? parseLong(value.substring("cancel:".length())) : null;
-            if (appointmentId == null || !appointmentId.equals(context.appointmentId()) || patient == null) {
+            if (appointmentId == null || !appointmentId.equals(context.appointmentId())) {
                 return myAppointment(context);
             }
+            List<Long> ids = household.stream().map(Patient::getId).toList();
             boolean open = appointments.findByIdAndClinicId(appointmentId, clinicId)
-                    .filter(a -> a.getPatientId().equals(patient.getId()))
+                    .filter(a -> a.getPatientId() != null && ids.contains(a.getPatientId()))
                     .filter(a -> a.getStatus() == AppointmentStatus.BOOKED || a.getStatus() == AppointmentStatus.CONFIRMED)
                     .filter(a -> a.getStartsAt().isAfter(now))
                     .isPresent();
@@ -454,6 +568,23 @@ class BookingFlow {
             }
             appointmentService.cancel(clinicId, appointmentId, CancelledBy.PATIENT);
             return new Step(ConversationState.DONE, context.cleared(), null, null, false);
+        }
+
+        /**
+         * The open appointments to come of everyone on the number, earliest first; at most a list's
+         * rows. Each is named for whom when a family shares the number.
+         */
+        private List<Upcoming> upcoming() {
+            if (household.isEmpty()) {
+                return List.of();
+            }
+            Map<Long, String> names = household.stream().collect(Collectors.toMap(Patient::getId, Patient::getName));
+            boolean family = household.size() > 1;
+            return appointments.findUpcomingOf(clinicId, names.keySet(), now).stream()
+                    .limit(MAX_ROWS)
+                    .map(a -> new Upcoming(a.getId(), family ? names.get(a.getPatientId()) : null,
+                            doctorName(a.getDoctorId()), a.getStartsAt()))
+                    .toList();
         }
 
         /** The first DAYS_SHOWN days with free times and how many each has, in date order. */
@@ -478,6 +609,11 @@ class BookingFlow {
             return doctors.findByIdAndClinicId(doctorId, clinicId).map(Doctor::getDisplayName)
                     .orElseThrow(() -> new NotFoundException("Doctor", doctorId));
         }
+    }
+
+    /** A typed name: 2 to 60 characters, with at least one letter. */
+    static boolean isName(String name) {
+        return name.length() >= 2 && name.length() <= 60 && name.codePoints().anyMatch(Character::isLetter);
     }
 
     private static @Nullable Long parseLong(String value) {

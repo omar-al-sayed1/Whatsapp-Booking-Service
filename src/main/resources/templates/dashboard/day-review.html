@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'doctors', ~{::main})}">
+<head><title th:text="${closed} ? #{day-review.title.closed(${dateLabel})} : #{day-review.title.hours(${dateLabel})}">Close Tuesday 27 October?</title></head>
+<body>
+<main class="container narrow">
+    <!--/*
+      A day off or special hours that leave out patients already booked: who they are, then cancel
+      their appointments (each patient is messaged to book another time) or keep them. Both post the
+      same day change again, with the choice.
+    */-->
+    <a class="back-link" th:href="@{/doctors/{id}(id=${doctor.id})}">
+        <svg class="icon flip-rtl" aria-hidden="true"><use href="#i-chevron-left"/></svg><span th:text="${doctor.displayName}">Dr. Khoury</span></a>
+    <header class="page-head">
+        <div>
+            <div class="eyebrow"><svg class="icon" aria-hidden="true"><use href="#i-today"/></svg>
+                <span th:text="#{settings.days}">Days off and special hours</span></div>
+            <h1 th:text="${closed} ? #{day-review.title.closed(${dateLabel})} : #{day-review.title.hours(${dateLabel})}">Close Tuesday 27 October?</h1>
+        </div>
+    </header>
+
+    <section class="card stack">
+        <p class="review-lead">
+            <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg>
+            <span th:text="${closed} ? #{day-review.lead.closed(${doctor.displayName}, ${leftOut.size() + ''})}
+                                     : #{day-review.lead.hours(${doctor.displayName}, ${hoursLabel}, ${leftOut.size() + ''})}">
+                Dr. Khoury has patients booked that day. Appointments: 3.</span>
+        </p>
+        <ul class="review-list" th:unless="${leftOut.isEmpty()}">
+            <li th:each="r : ${leftOut}">
+                <span class="review-time" th:text="${r.time()}">10:30 AM</span>
+                <span class="avatar sm" th:if="${r.patient()}" th:style="'--hue:' + ${@avatars.hue(r.patient())}"
+                      th:text="${@avatars.initials(r.patient())}">RH</span>
+                <span class="grow">
+                    <strong th:text="${r.patient()} ?: #{day-review.no-patient}">Rana Haddad</strong>
+                    <span class="muted small" dir="ltr" th:if="${r.phone()}" th:text="${r.phone()}">+96170123456</span>
+                    <span class="review-call-note" th:if="${r.optedOut()}" th:text="#{day-review.no-message}">No WhatsApp message (opted out): call them</span>
+                </span>
+                <a class="button sm" th:if="${r.phone()}" th:href="'tel:' + ${r.phone()}">
+                    <svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg><span th:text="#{attention.call}">Call</span></a>
+            </li>
+        </ul>
+    </section>
+
+    <div class="review-choices">
+        <form method="post" th:action="@{/doctors/{id}/days(id=${doctor.id})}" class="review-choice">
+            <input type="hidden" name="date" th:value="${date}">
+            <input type="hidden" name="closed" th:value="${closed}">
+            <input type="hidden" name="start" th:if="${start}" th:value="${start}">
+            <input type="hidden" name="end" th:if="${end}" th:value="${end}">
+            <input type="hidden" name="appointments" value="cancel">
+            <button type="submit" class="danger"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
+                <span th:text="#{day-review.cancel}">Cancel them and message the patients</span></button>
+            <p class="hint" th:text="#{day-review.cancel.hint}">Each patient gets a WhatsApp message that the doctor is not available then, with a button to book another time.</p>
+        </form>
+        <form method="post" th:action="@{/doctors/{id}/days(id=${doctor.id})}" class="review-choice">
+            <input type="hidden" name="date" th:value="${date}">
+            <input type="hidden" name="closed" th:value="${closed}">
+            <input type="hidden" name="start" th:if="${start}" th:value="${start}">
+            <input type="hidden" name="end" th:if="${end}" th:value="${end}">
+            <input type="hidden" name="appointments" value="keep">
+            <button type="submit"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>
+                <span th:text="#{day-review.keep}">Keep the appointments</span></button>
+            <p class="hint" th:text="#{day-review.keep.hint}">Only new bookings stop; these patients stay booked and still get their reminders.</p>
+        </form>
+    </div>
+    <a class="button ghost" th:href="@{/doctors/{id}(id=${doctor.id})}" th:text="#{day-review.back}">Don't change the day</a>
+</main>
+</body>
+</html>

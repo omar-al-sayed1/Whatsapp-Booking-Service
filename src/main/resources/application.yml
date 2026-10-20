@@ -43,10 +43,12 @@ whatsapp:
   graph-version: ${WA_GRAPH_VERSION:}
   token-encryption-key: ${TOKEN_ENCRYPTION_KEY:}
   base-url: https://graph.facebook.com
-  # Pricing category of each template as approved by Meta (SPEC section 6).
+  # Pricing category of each template as approved by Meta (SPEC section 6). appointment_cancelled_by_clinic
+  # is not submitted yet: confirm its category once Meta approves it.
   template-categories:
     appointment_reminder: utility
     appointment_reminder_soon: utility
+    appointment_cancelled_by_clinic: utility
   # Meta prices by the recipient's country calling code. Add markets from the rate card as needed.
   markets:
     "961": Rest of Middle East

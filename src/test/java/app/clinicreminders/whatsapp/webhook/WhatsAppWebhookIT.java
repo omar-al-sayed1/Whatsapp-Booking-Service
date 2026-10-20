@@ -181,7 +181,7 @@ class WhatsAppWebhookIT extends IntegrationTest {
         post(text("STOP"));
         processor.drain();
 
-        assertThat(patients.findByClinicIdAndPhoneE164(clinic.getId(), PATIENT_PHONE).orElseThrow().isOptedOut()).isTrue();
+        assertThat(patients.findByClinicIdAndPhoneE164OrderById(clinic.getId(), PATIENT_PHONE).getFirst().isOptedOut()).isTrue();
         assertThat(received()).isEmpty();
         assertThat(messenger.send(clinic.getId(), new TextMessage(PATIENT_PHONE, "hello"), null).result())
                 .isEqualTo(Result.OPTED_OUT);
@@ -193,7 +193,7 @@ class WhatsAppWebhookIT extends IntegrationTest {
                 clock.instant()));
         processor.drain();
 
-        Patient created = patients.findByClinicIdAndPhoneE164(clinic.getId(), "+96171999888").orElseThrow();
+        Patient created = patients.findByClinicIdAndPhoneE164OrderById(clinic.getId(), "+96171999888").getFirst();
         assertThat(created.isOptedOut()).isTrue();
         assertThat(created.getLanguage()).isEqualTo(Language.AR);
         assertThat(created.getName()).isEqualTo("Karim");
@@ -266,7 +266,7 @@ class WhatsAppWebhookIT extends IntegrationTest {
         MessageLog log = logs.findByClinicIdAndWaMessageId(fixtureClinic.getId(), "wamid.TEMPLATE-REMINDER-1").orElseThrow();
         assertThat(log.getStatus()).isEqualTo(MessageStatus.DELIVERED);
         assertThat(log.getPricingCategory()).isEqualTo("utility");
-        assertThat(patients.findByClinicIdAndPhoneE164(fixtureClinic.getId(), "+96170123456").orElseThrow().getWaUserId())
+        assertThat(patients.findByClinicIdAndPhoneE164OrderById(fixtureClinic.getId(), "+96170123456").getFirst().getWaUserId())
                 .isEqualTo("LB.13491208655302741918");
         assertThat(inboxSize()).isZero();
     }

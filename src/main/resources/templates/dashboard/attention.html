@@ -50,7 +50,7 @@
                 <h2 th:text="#{attention.failed}">Messages that could not be sent</h2>
                 <p class="section-sub" th:text="#{attention.failed.window}">Last 7 days</p>
             </div>
-            <span class="count" th:classappend="${!failed.isEmpty()} ? 'alert-count'" th:text="${failed.size()}">1</span>
+            <span class="count" th:classappend="${failedTotal > 0} ? 'alert-count'" th:text="${failedTotal}">1</span>
         </div>
         <div class="all-clear" th:if="${failed.isEmpty()}">
             <svg class="icon" aria-hidden="true"><use href="#i-check-circle"/></svg><span th:text="#{attention.failed.empty}">No failed messages.</span>
@@ -59,6 +59,7 @@
             These patients did not get the message. Call them if it matters.</p>
         <!--/* Stacked: what failed and when, why (on its own line, it can be long), then who and the way to reach them. */-->
         <ul class="inbox" th:unless="${failed.isEmpty()}">
+            <th:block th:fragment="failed-rows">
             <li class="inbox-item failed" th:each="f : ${failed}">
                 <span class="icon-bubble"><svg class="icon" aria-hidden="true"><use th:href="${f.templateName()} ? '#i-bell' : '#i-message'"/></svg></span>
                 <div class="inbox-main">
@@ -84,6 +85,16 @@
                         <svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg><span th:text="#{attention.call}">Call</span></a>
                 </div>
             </li>
+            <!--/* More failed sends load as you scroll ("failed-rows" is also what the next page brings). */-->
+            <li class="load-more" th:if="${nextFailedPage != null}">
+                <div class="load-more-skeleton stacked">
+                    <th:block th:each="i : ${#numbers.sequence(1, 2)}"><div th:replace="~{dashboard/skeletons :: inbox}"></div></th:block>
+                </div>
+                <a class="load-more-link" th:href="@{/attention(failedPage=${nextFailedPage})}"
+                   th:hx-get="@{/attention(failedPage=${nextFailedPage})}" hx-trigger="intersect once, click"
+                   hx-target="closest .load-more" hx-swap="outerHTML" th:text="#{list.load-more}">Show more</a>
+            </li>
+            </th:block>
         </ul>
     </section>
 </main>

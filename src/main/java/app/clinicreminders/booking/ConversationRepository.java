@@ -15,6 +15,8 @@ public interface ConversationRepository extends Repository<Conversation, Long> {
 
     List<Conversation> findByClinicIdAndNeedsHumanTrueOrderByUpdatedAtDesc(Long clinicId);
 
+    long countByClinicIdAndNeedsHumanTrue(Long clinicId);
+
     Optional<Conversation> findByIdAndClinicId(Long id, Long clinicId);
 
     /**

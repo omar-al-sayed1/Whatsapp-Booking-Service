@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.Optional;
 
 import app.clinicreminders.appointment.AppointmentEvents.Cancelled;
+import app.clinicreminders.appointment.AppointmentEvents.CancelledDoctorAway;
 import app.clinicreminders.appointment.AppointmentEvents.CancelledBy;
 import app.clinicreminders.appointment.AppointmentEvents.Scheduled;
 import app.clinicreminders.common.NotFoundException;
@@ -94,6 +95,12 @@ public class AppointmentService {
     public void cancel(long clinicId, long appointmentId, CancelledBy by) {
         find(clinicId, appointmentId).cancel(clock.instant(), by);
         events.publishEvent(new Cancelled(clinicId, appointmentId, by));
+    }
+
+    /** As {@link #cancel} by the clinic, because the doctor won't be there then: the patient is told and offered another time. */
+    public void cancelDoctorAway(long clinicId, long appointmentId) {
+        cancel(clinicId, appointmentId, CancelledBy.STAFF);
+        events.publishEvent(new CancelledDoctorAway(clinicId, appointmentId));
     }
 
     public void markArrived(long clinicId, long appointmentId) {

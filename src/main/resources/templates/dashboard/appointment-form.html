@@ -143,6 +143,7 @@
                                     </button>
                                 </th:block>
                             </div>
+                            <div th:replace="~{dashboard/skeletons :: picker}"></div>
                         </div>
                     </div>
                     <div class="picker-divider"><span th:text="#{form.patient.or-new}">Or type their details</span></div>
@@ -154,25 +155,39 @@
                         <svg class="icon" aria-hidden="true"><use href="#i-phone"/></svg>
                         <input type="tel" name="phone" th:value="${form.phone()}" required dir="ltr" inputmode="tel" autocomplete="off"
                                th:hx-get="@{/appointments/patient-hint}" hx-trigger="input changed delay:300ms"
-                               hx-target="#patient-hint" hx-swap="outerHTML" hx-sync="this:replace">
+                               hx-include="[name='name']" hx-target="#patient-hint" hx-swap="outerHTML" hx-sync="#patient-hint:replace">
                     </span>
                     <span class="hint" th:text="#{form.phone.hint}">e.g. 03 123 456</span>
                 </label>
+                <!--/*
+                  Who has the number typed: a known patient, a new one, or a family. A known number with a new
+                  name adds a family member; the number's other patients are offered to pick from (app.js).
+                */-->
                 <div th:fragment="patient-hint" id="patient-hint" class="patient-hint" aria-live="polite"
                      th:classappend="${hintPatient != null} ? 'known' : (${hintPhone != null} ? 'new' : '')">
                     <th:block th:if="${hintPatient != null}">
                         <svg class="icon" aria-hidden="true"><use href="#i-user-check"/></svg>
                         <span th:text="#{form.patient.known(${hintPatient.name})}">Known patient: Rana Haddad</span>
-                        <span class="chip chip-CANCELLED" th:if="${hintPatient.optedOut}" th:text="#{patients.opted-out}">Opted out</span>
                     </th:block>
                     <th:block th:if="${hintPatient == null and hintPhone != null}">
-                        <svg class="icon" aria-hidden="true"><use href="#i-sparkle"/></svg>
-                        <span th:text="#{form.patient.new}">New patient: enter their name</span>
+                        <svg class="icon" aria-hidden="true"><use th:href="${hintKnownNumber} ? '#i-users' : '#i-sparkle'"/></svg>
+                        <span th:text="${!hintKnownNumber} ? #{form.patient.new} : (${#strings.isEmpty(hintName)} ? #{form.patient.which} : #{form.patient.family-new})">New patient: enter their name below.</span>
                     </th:block>
+                    <span class="chip chip-CANCELLED" th:if="${hintOptedOut}" th:text="#{patients.opted-out}">Opted out</span>
+                    <div class="hint-family" th:if="${hintOthers != null and !hintOthers.isEmpty()}">
+                        <span class="muted" th:text="${hintPatient != null} ? #{form.patient.also} : #{form.patient.on-number}">On this number:</span>
+                        <button type="button" class="hint-chip" th:each="p : ${hintOthers}" data-fill-patient
+                                th:attr="data-name=${p.name},data-phone=${p.phoneE164},data-language=${p.language.code()}">
+                            <span class="avatar xs" th:style="'--hue:' + ${@avatars.hue(p.name)}" th:text="${@avatars.initials(p.name)}">KH</span>
+                            <span th:text="${p.name}">Karim Haddad</span>
+                        </button>
+                    </div>
                 </div>
                 <label>
                     <span th:text="#{form.name}">Name</span>
-                    <input type="text" name="name" th:value="${form.name()}" autocomplete="off">
+                    <input type="text" name="name" th:value="${form.name()}" autocomplete="off"
+                           th:hx-get="@{/appointments/patient-hint}" hx-trigger="input changed delay:300ms"
+                           hx-include="[name='phone']" hx-target="#patient-hint" hx-swap="outerHTML" hx-sync="#patient-hint:replace">
                     <span class="hint" th:text="#{form.name.hint}">Needed for a new patient</span>
                 </label>
                 <div class="stack tight">

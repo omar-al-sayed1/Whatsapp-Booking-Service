@@ -38,9 +38,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 /**
- * Manual entry: book a patient (found by phone, or created), and move an appointment. The time
- * is a free slot from the slot engine or, for squeeze-ins, any other time; the database still
+ * Manual entry: book a patient (found by phone and name, or created), and move an appointment. The
+ * time is a free slot from the slot engine or, for squeeze-ins, any other time; the database still
  * refuses two active appointments of a doctor starting together.
+ *
+ * <p>A family may share a phone: a known number with a new name adds a family member, and a number
+ * with several patients needs the name to tell them apart.
  */
 @Controller
 class AppointmentFormController {
@@ -93,7 +96,9 @@ class AppointmentFormController {
         Long doctor = doctorId != null && ctx.sees(doctorId) ? doctorId : active.isEmpty() ? null : active.getFirst().getId();
         // Booking a known patient (from the Patients page): their language, not the clinic default.
         String language = Optional.ofNullable(PhoneNumbers.parseLebanese(phone))
-                .flatMap(phoneE164 -> patients.findByClinicIdAndPhoneE164(ctx.clinicId(), phoneE164))
+                .map(phoneE164 -> patientService.household(ctx.clinicId(), phoneE164))
+                .flatMap(household -> Optional.ofNullable(chosen(household, name))
+                        .or(() -> household.stream().findFirst()))
                 .map(patient -> patient.getLanguage().code())
                 .orElse(ctx.clinic().getDefaultLanguage().code());
         Form form = new Form(null, doctor, date != null ? date : ctx.today(), time == null ? "" : time, "", phone, name,
@@ -117,15 +122,14 @@ class AppointmentFormController {
         return "dashboard/appointment-form :: patient-results";
     }
 
-    /** As the secretary types a phone number: is this a patient we know, or a new one? */
+    /**
+     * As the secretary types a phone number or a name: is this a patient we know, a new one, or a
+     * new member of a family on a known number?
+     */
     @GetMapping("/appointments/patient-hint")
     String patientHint(@AuthenticationPrincipal StaffPrincipal staff, HttpServletRequest request, Model model,
-                       @RequestParam(defaultValue = "") String phone) {
-        Ctx ctx = context.of(staff, request);
-        String phoneE164 = PhoneNumbers.parseLebanese(phone);
-        model.addAttribute("hintPhone", phoneE164);
-        model.addAttribute("hintPatient", phoneE164 == null ? null
-                : patients.findByClinicIdAndPhoneE164(ctx.clinicId(), phoneE164).orElse(null));
+                       @RequestParam(defaultValue = "") String phone, @RequestParam(defaultValue = "") String name) {
+        addHint(context.of(staff, request), PhoneNumbers.parseLebanese(phone), name, model);
         return "dashboard/appointment-form :: patient-hint";
     }
 
@@ -163,16 +167,16 @@ class AppointmentFormController {
         if (phoneE164 == null) {
             return showForm(ctx, form, "error.phone", model);
         }
-        boolean known = patients.findByClinicIdAndPhoneE164(ctx.clinicId(), phoneE164).isPresent();
-        if (!known && name.isBlank()) {
-            return showForm(ctx, form, "error.name-required", model);
+        List<Patient> household = patientService.household(ctx.clinicId(), phoneE164);
+        if (name.isBlank() && household.size() != 1) {
+            return showForm(ctx, form, household.isEmpty() ? "error.name-required" : "error.name-which", model);
         }
         if (start == null) {
             return showForm(ctx, form, "error.time-required", model);
         }
         try {
-            Patient patient = patientService.findOrCreate(ctx.clinicId(), phoneE164, name,
-                    language.equals("en") ? Language.EN : Language.AR);
+            Patient patient = name.isBlank() ? household.getFirst() : patientService.findOrCreate(ctx.clinicId(),
+                    phoneE164, name, language.equals("en") ? Language.EN : Language.AR);
             appointmentService.book(ctx.clinicId(), doctorId, patient.getId(), ctx.instant(date, start),
                     AppointmentSource.MANUAL);
         } catch (SlotTakenException e) {
@@ -235,13 +239,33 @@ class AppointmentFormController {
         model.addAttribute("form", form);
         model.addAttribute("doctors", form.appointmentId() == null ? activeDoctors(ctx) : List.of());
         model.addAttribute("slots", form.doctorId() == null ? List.of() : slotOptions(ctx, form.doctorId(), form.date()));
-        String phoneE164 = PhoneNumbers.parseLebanese(form.phone());
-        model.addAttribute("hintPhone", phoneE164);
-        model.addAttribute("hintPatient", phoneE164 == null ? null
-                : patients.findByClinicIdAndPhoneE164(ctx.clinicId(), phoneE164).orElse(null));
+        addHint(ctx, PhoneNumbers.parseLebanese(form.phone()), form.name(), model);
         // Not "error": the layout turns that into a toast; the form shows its own next to the fields.
         model.addAttribute("formError", error);
         return "dashboard/appointment-form";
+    }
+
+    /**
+     * The hint under the phone: {@code hintPatient} the one being booked (by name, or the number's
+     * only patient), {@code hintOthers} the number's other patients, offered as a family to pick from.
+     */
+    private void addHint(Ctx ctx, @Nullable String phoneE164, String name, Model model) {
+        List<Patient> household = phoneE164 == null ? List.of() : patientService.household(ctx.clinicId(), phoneE164);
+        Patient chosen = chosen(household, name);
+        model.addAttribute("hintPhone", phoneE164);
+        model.addAttribute("hintName", name.strip());
+        model.addAttribute("hintPatient", chosen);
+        model.addAttribute("hintOthers", household.stream().filter(patient -> patient != chosen).toList());
+        model.addAttribute("hintKnownNumber", !household.isEmpty());
+        model.addAttribute("hintOptedOut", household.stream().anyMatch(Patient::isOptedOut));
+    }
+
+    /** The number's patient of this name or, with no name, its only patient; null for a new name (or a family, unnamed). */
+    private static @Nullable Patient chosen(List<Patient> household, String name) {
+        if (name.isBlank()) {
+            return household.size() == 1 ? household.getFirst() : null;
+        }
+        return household.stream().filter(patient -> patient.hasName(name)).findFirst().orElse(null);
     }
 
     private Form rescheduleForm(Ctx ctx, Appointment appointment, LocalDate date, String time, String otherTime) {

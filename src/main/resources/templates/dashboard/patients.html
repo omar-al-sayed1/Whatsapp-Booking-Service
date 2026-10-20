@@ -16,7 +16,7 @@
         <input type="search" name="q" th:value="${q}" th:placeholder="#{patients.search}" th:aria-label="#{patients.search}"
                autocomplete="off" data-key="slash" dir="auto"
                th:hx-get="@{/patients}" hx-trigger="input changed delay:250ms, search" hx-target="#patient-results"
-               hx-select="#patient-results" hx-swap="outerHTML" hx-push-url="true" hx-indicator=".big-search">
+               hx-select="#patient-results" hx-swap="outerHTML" hx-push-url="true" hx-indicator=".big-search, #patient-results">
         <span class="htmx-indicator" aria-hidden="true"></span>
         <kbd class="kbd-hint">/</kbd>
     </form>
@@ -29,12 +29,14 @@
         </div>
 
         <th:block th:unless="${patients.isEmpty()}">
-            <p class="results-note" th:text="${patients.size() >= 50} ? #{patients.limited} : #{patients.count(${patients.size() + ''})}">12 patients</p>
+            <p class="results-note" th:text="#{patients.count(${total + ''})}">12 patients</p>
             <!--/*
               A card per patient: who (and delete), their next appointment or none, then Call and Book.
-              Stacked rather than side by side, so nothing gets squeezed on a phone.
+              Stacked rather than side by side, so nothing gets squeezed on a phone. "rows" is also what
+              the next page brings as you scroll: its cards, then the loader for the page after.
             */-->
             <ul class="people">
+                <th:block th:fragment="rows">
                 <li class="person" th:each="p : ${patients}">
                     <div class="person-head">
                         <span class="avatar lg" th:style="'--hue:' + ${@avatars.hue(p.name())}" th:text="${@avatars.initials(p.name())}">RH</span>
@@ -51,6 +53,8 @@
                                 <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button>
                         </form>
                     </div>
+                    <p class="family-note" th:if="${p.family()}">
+                        <svg class="icon" aria-hidden="true"><use href="#i-users"/></svg><span th:text="#{patients.family(${p.family()})}">Same number as Karim Haddad</span></p>
                     <p class="opted-out-note" th:if="${p.optedOut()}">
                         <svg class="icon" aria-hidden="true"><use href="#i-alert"/></svg><span th:text="#{patients.opted-out}">Opted out (no messages)</span></p>
 
@@ -77,6 +81,15 @@
                             <svg class="icon" aria-hidden="true"><use href="#i-calendar-plus"/></svg><span th:text="#{patients.book}">Book</span></a>
                     </div>
                 </li>
+                <li class="load-more" th:if="${nextPage != null}">
+                    <div class="load-more-skeleton">
+                        <th:block th:each="i : ${#numbers.sequence(1, 3)}"><div th:replace="~{dashboard/skeletons :: person}"></div></th:block>
+                    </div>
+                    <a class="load-more-link" th:href="@{/patients(q=${q}, page=${nextPage})}"
+                       th:hx-get="@{/patients(q=${q}, page=${nextPage})}" hx-trigger="intersect once, click"
+                       hx-target="closest .load-more" hx-swap="outerHTML" th:text="#{list.load-more}">Show more</a>
+                </li>
+                </th:block>
             </ul>
         </th:block>
     </section>

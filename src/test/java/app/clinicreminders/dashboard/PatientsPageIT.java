@@ -66,7 +66,7 @@ class PatientsPageIT extends DashboardTest {
         data.appointment(doctor, rana, Instant.parse("2026-10-21T07:30:00Z"), Duration.ofMinutes(30));
         data.appointment(doctor, rana, Instant.parse("2026-10-28T07:30:00Z"), Duration.ofMinutes(30));
         data.appointment(doctor, rana, Instant.parse("2026-10-01T07:30:00Z"), Duration.ofMinutes(30));
-        Patient karim = patients.findByClinicIdAndPhoneE164(clinic.getId(), "+9613111222").orElseThrow();
+        Patient karim = patients.findByClinicIdAndPhoneE164OrderById(clinic.getId(), "+9613111222").getFirst();
         data.cancelledAppointment(doctor, karim, Instant.parse("2026-10-22T07:30:00Z"), Duration.ofMinutes(30));
 
         assertThat(get(staff, "/patients")).hasStatusOk().bodyText()
@@ -109,9 +109,28 @@ class PatientsPageIT extends DashboardTest {
     }
 
     @Test
+    void theListLoadsThirtyAtATimeAsYouScroll() {
+        for (int i = 0; i < 30; i++) {
+            data.patient(clinic, "Zed " + (100 + i), "+9617099" + (1000 + i), Language.AR);
+        }
+
+        assertThat(get(staff, "/patients")).bodyText()
+                .contains("32 patients", "class=\"load-more\"", "hx-get=\"/patients?q=&amp;page=2\"")
+                .doesNotContain("Zed 128", "Zed 129");
+        assertThat(get(staff, "/patients?page=2").header("HX-Request", "true")).hasStatusOk().bodyText()
+                .as("only the next cards, to append").contains("Zed 128", "Zed 129").doesNotContain("<html", "class=\"load-more\"");
+        assertThat(get(staff, "/patients?q=zed")).bodyText().as("thirty fit on one page")
+                .contains("30 patients", "Zed 129").doesNotContain("class=\"load-more\"", "Rana Haddad");
+        data.patient(clinic, "Zed 130", "+961709992000", Language.AR);
+        assertThat(get(staff, "/patients?q=zed")).bodyText().as("the search goes with the next page")
+                .contains("hx-get=\"/patients?q=zed&amp;page=2\"");
+        assertThat(get(staff, "/patients?q=rana")).bodyText().contains("1 patients").doesNotContain("class=\"load-more\"");
+    }
+
+    @Test
     void anotherClinicsPatientCannotBeDeleted() {
-        Patient theirs = patients.findByClinicIdAndPhoneE164(
-                jdbc.queryForObject("select id from clinic where name = 'B'", Long.class), "+96170123457").orElseThrow();
+        Patient theirs = patients.findByClinicIdAndPhoneE164OrderById(
+                jdbc.queryForObject("select id from clinic where name = 'B'", Long.class), "+96170123457").getFirst();
 
         assertThat(post(staff, "/patients/{id}/delete", theirs.getId())).hasStatus(404);
         assertThat(jdbc.queryForObject("select count(*) from patient", Integer.class)).isEqualTo(3);

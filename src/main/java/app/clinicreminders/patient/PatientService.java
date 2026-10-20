@@ -1,7 +1,10 @@
 package app.clinicreminders.patient;
 
 import java.time.Clock;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import app.clinicreminders.appointment.Appointment;
 import app.clinicreminders.appointment.AppointmentEvents.CancelledBy;
@@ -10,6 +13,9 @@ import app.clinicreminders.appointment.AppointmentService;
 import app.clinicreminders.booking.ConversationRepository;
 import app.clinicreminders.common.Language;
 import app.clinicreminders.common.NotFoundException;
+import org.jspecify.annotations.Nullable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,24 +38,55 @@ public class PatientService {
         this.clock = clock;
     }
 
-    /** The clinic's patient with this number, or a new one. An existing patient keeps their name and language. */
+    /**
+     * The patient with this number and name (any case), or a new one: a family member when others
+     * already have the number. An existing patient keeps their language; a new one on a number that
+     * opted out is opted out too.
+     */
     public Patient findOrCreate(long clinicId, String phoneE164, String name, Language language) {
-        return patients.findByClinicIdAndPhoneE164(clinicId, phoneE164)
-                .orElseGet(() -> patients.save(new Patient(clinicId, name.strip(), phoneE164, language)));
+        List<Patient> household = household(clinicId, phoneE164);
+        return household.stream()
+                .filter(patient -> patient.hasName(name))
+                .findFirst()
+                .orElseGet(() -> {
+                    Patient patient = new Patient(clinicId, name, phoneE164, language);
+                    if (household.stream().anyMatch(Patient::isOptedOut)) {
+                        patient.optOut();
+                    }
+                    return patients.save(patient);
+                });
     }
 
-    /** By name, or by phone when the query looks like a number (any digits typed are matched). */
+    /** Everyone on this number (a parent and their children), first added first. */
     @Transactional(readOnly = true)
-    public List<Patient> search(long clinicId, String query) {
-        String name = query.strip();
-        return patients.search(clinicId, name, searchDigits(name));
+    public List<Patient> household(long clinicId, String phoneE164) {
+        return patients.findByClinicIdAndPhoneE164OrderById(clinicId, phoneE164);
     }
 
-    /** As {@link #search}, among the patients with an appointment with that doctor. */
+    /** Everyone on any of these numbers, by number and then by name: who shares a number with whom. */
     @Transactional(readOnly = true)
-    public List<Patient> searchOfDoctor(long clinicId, long doctorId, String query) {
+    public Map<String, List<Patient>> households(long clinicId, Collection<String> phones) {
+        return phones.isEmpty() ? Map.of() : patients.findByClinicIdAndPhoneE164InOrderByName(clinicId, phones).stream()
+                .collect(Collectors.groupingBy(Patient::getPhoneE164));
+    }
+
+    /** One page of a patient search, and how many match in all. */
+    public record Found(List<Patient> patients, long total) {
+    }
+
+    /**
+     * By name, or by phone when the query looks like a number (any digits typed are matched), one
+     * page at a time (from 0). With a doctor, only the patients with an appointment with them.
+     */
+    @Transactional(readOnly = true)
+    public Found search(long clinicId, @Nullable Long doctorId, String query, int page, int size) {
         String name = query.strip();
-        return patients.searchOfDoctor(clinicId, doctorId, name, searchDigits(name));
+        String digits = searchDigits(name);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), size);
+        return doctorId == null
+                ? new Found(patients.search(clinicId, name, digits, pageable), patients.countSearch(clinicId, name, digits))
+                : new Found(patients.searchOfDoctor(clinicId, doctorId, name, digits, pageable),
+                        patients.countSearchOfDoctor(clinicId, doctorId, name, digits));
     }
 
     /**
@@ -80,9 +117,10 @@ public class PatientService {
 
     /**
      * Deletes a patient on request (SPEC section 5.3): cancels their future appointments, removes
-     * their WhatsApp conversation and deletes the patient. Past appointments stay for the monthly
-     * report with no patient attached. {@code message_log} holds no phone numbers or message text,
-     * so nothing in it identifies them once the link to the patient is gone.
+     * their WhatsApp conversation (unless family members still use the number) and deletes the
+     * patient. Past appointments stay for the monthly report with no patient attached.
+     * {@code message_log} holds no phone numbers or message text, so nothing in it identifies them
+     * once the link to the patient is gone.
      */
     public void delete(long clinicId, long patientId) {
         Patient patient = patients.findByIdAndClinicId(patientId, clinicId)
@@ -93,7 +131,9 @@ public class PatientService {
                 appointmentService.cancel(clinicId, appointment.getId(), CancelledBy.STAFF);
             }
         }
-        conversations.deleteByClinicIdAndPatientPhone(clinicId, patient.getPhoneE164());
+        if (household(clinicId, patient.getPhoneE164()).size() == 1) {
+            conversations.deleteByClinicIdAndPatientPhone(clinicId, patient.getPhoneE164());
+        }
         patients.delete(patient);
     }
 }

@@ -34,7 +34,7 @@ All tenant-owned tables carry `clinic_id`. Timestamps are `timestamptz` in UTC.
 | `doctor` | id, clinic_id, display_name, slot_minutes, active |
 | `schedule_rule` | id, doctor_id, day_of_week, start_time, end_time |
 | `schedule_exception` | id, doctor_id, date, closed (bool), start_time, end_time |
-| `patient` | id, clinic_id, name, phone_e164, language, opted_out, created_at. Unique (clinic_id, phone_e164) |
+| `patient` | id, clinic_id, name, phone_e164, language, opted_out, created_at. Unique (clinic_id, phone_e164, lower(name)): a family shares one number, each under their own name; opting out is the number's |
 | `appointment` | id, clinic_id, doctor_id, patient_id, starts_at, ends_at, status (`BOOKED`, `CONFIRMED`, `CANCELLED`, `NO_SHOW`, `ARRIVED`), source (`WHATSAPP`, `MANUAL`), cancelled_at, created_at. No two active appointments for the same doctor and start time |
 | `reminder` | id, clinic_id, appointment_id, kind (`H24`, `H2`), due_at, status (`PENDING`, `SENT`, `SKIPPED`, `CANCELLED`, `FAILED`), attempts, sent_message_id |
 | `message_log` | id, clinic_id, appointment_id (nullable), direction (`IN`, `OUT`), wa_message_id (unique), kind (`TEMPLATE`, `INTERACTIVE`, `TEXT`, `BUTTON_REPLY`), template_name, pricing_category, status (`SENT`, `DELIVERED`, `READ`, `FAILED`), est_cost_usd, created_at. Store no message bodies beyond what debugging needs |
@@ -71,6 +71,9 @@ and location).
   slot was taken in the meantime the patient is offered the next free slots.
 - Unrecognized text: send the menu once, set `needs_human`, and show it on the dashboard so the
   secretary can call the patient.
+- Families: a parent books for their children from one phone. `CONFIRM` asks who the appointment
+  is for (the number's patients, or "Someone else", whose name is typed in `ENTER_NAME`), and My
+  appointment shows the appointments of everyone on the number.
 - Every step costs money since October 2026, so keep the whole booking to about 5 messages.
 
 ### 5.3 Dashboard (Thymeleaf + htmx)
@@ -110,9 +113,14 @@ demos.
 | --- | --- | --- | --- |
 | `appointment_reminder` | 24 hours before | Hello {{1}}, this is a reminder of your appointment with {{2}} tomorrow, {{3}} at {{4}}. | Confirm, Cancel |
 | `appointment_reminder_soon` | 2 hours before | Hello {{1}}, your appointment with {{2}} is today at {{3}}. | Confirm, Cancel |
+| `appointment_cancelled_by_clinic` | The clinic closes a day (or shortens its hours) and cancels the appointments it leaves out | Hello {{1}}, we're sorry: your appointment with {{2}} on {{3}} at {{4}} is cancelled because the doctor is not available then. Tap Book another time to choose a new one. | Book another time |
 
   Arabic draft for `appointment_reminder`: مرحباً {{1}}، نذكّرك بموعدك مع {{2}} غداً {{3}} الساعة {{4}}.
   Buttons: تأكيد، إلغاء
+
+  Arabic draft for `appointment_cancelled_by_clinic`: مرحباً {{1}}، نعتذر: أُلغي موعدك مع {{2}} يوم {{3}}
+  الساعة {{4}} لأن الطبيب غير متاح في ذلك الوقت. اضغط «احجز موعدًا آخر» لاختيار موعد جديد.
+  Button: احجز موعدًا آخر. Submitted as UTILITY; Meta decides the category on review.
 
 - Retry transient errors (5xx, rate limits) with backoff, up to 3 attempts. After that, mark the
   reminder `FAILED` and show it under Needs attention.

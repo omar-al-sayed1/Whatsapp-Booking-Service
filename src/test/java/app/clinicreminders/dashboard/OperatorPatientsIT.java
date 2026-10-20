@@ -101,16 +101,19 @@ class OperatorPatientsIT extends DashboardTest {
     }
 
     @Test
-    void pagesTwentyFiveAtATime() {
+    void loadsTwentyFiveAtATimeAsYouScroll() {
         for (int i = 0; i < 26; i++) {
             data.patient(clinicB, "Zed " + (100 + i), "+9617099" + (1000 + i), Language.AR);
         }
 
-        assertThat(get(operator, "/operator/patients")).bodyText()
-                .contains("Patients found: 29", "Page 1 of 2", "href=\"/operator/patients?page=2\"").doesNotContain("Zed 125");
-        assertThat(get(operator, "/operator/patients?page=2")).bodyText()
-                .contains("Page 2 of 2", "Zed 125", "href=\"/operator/patients?page=1\"");
-        assertThat(get(operator, "/operator/patients?page=99")).hasStatusOk().bodyText().contains("Page 2 of 2");
+        assertThat(get(operator, "/operator/patients?sort=name")).bodyText()
+                .contains("Patients found: 29", "class=\"load-more\"", "hx-get=\"/operator/patients?sort=name&amp;page=2\"")
+                .doesNotContain("Zed 125");
+        assertThat(get(operator, "/operator/patients?sort=name&page=2").header("HX-Request", "true")).bodyText()
+                .as("only the next rows, to append").contains("Zed 125").doesNotContain("<html", "class=\"load-more\"");
+        assertThat(get(operator, "/operator/patients?page=2")).bodyText().as("without JavaScript, a page of its own")
+                .contains("<html", "Zed 125");
+        assertThat(get(operator, "/operator/patients?page=99")).hasStatusOk().bodyText().contains("Zed 125");
     }
 
     @Test

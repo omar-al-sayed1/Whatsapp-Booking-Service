@@ -199,6 +199,9 @@ kbd { font: 600 .72rem/1 "Plex", ui-monospace, monospace; padding: .18rem .38rem
 .bell.has-alerts { color: var(--text-2); }
 .bell.active { background: var(--brand-50); border-color: transparent; color: var(--brand-700); }
 .bell .icon { width: 1.3rem; height: 1.3rem; }
+/* Needs attention in the account menu, and the dot on the avatar: phones only (see the 900px rules). */
+.menu-panel a.menu-attention, .menu-attention-rule, .avatar-alert { display: none; }
+.menu-panel a.menu-attention.active { background: var(--brand-50); color: var(--brand-700); }
 .bell .nav-badge { position: absolute; inset-block-start: .15rem; inset-inline-end: .15rem; margin: 0; min-width: 1.1rem; height: 1.1rem;
                    padding-inline: .25rem; font-size: .62rem; box-shadow: 0 0 0 2px var(--surface); }
 
@@ -688,6 +691,7 @@ a.block.free:hover .icon { opacity: 1; }
 .ghost-danger { border-color: transparent; background: none; color: var(--muted); }
 .ghost-danger:hover, .ghost-danger:focus-visible { background: var(--danger-bg); border-color: transparent; color: var(--danger); }
 .opted-out-note { display: flex; align-items: center; gap: .4rem; margin: -.2rem 0 0; font-size: .8rem; font-weight: 600; color: var(--danger); }
+.family-note { display: flex; align-items: center; gap: .4rem; margin: -.2rem 0 0; font-size: .8rem; font-weight: 500; color: var(--muted); }
 /* The next appointment (it opens the details), or a quiet line when there is none. */
 .next-appt { display: flex; align-items: center; gap: .7rem; padding: .6rem .75rem; border-radius: 12px; text-decoration: none; }
 .next-appt.booked { background: var(--info-bg); color: var(--info); transition: filter .15s; }
@@ -735,8 +739,6 @@ a.block.free:hover .icon { opacity: 1; }
                      font-variant-numeric: tabular-nums; }
 .pill-upcoming { display: inline-block; padding: .15rem .5rem; border-radius: 7px; background: var(--info-bg); color: var(--info);
                  font-weight: 600; font-size: .8rem; white-space: nowrap; }
-.pager { display: flex; align-items: center; justify-content: center; gap: .75rem; margin-block-start: 1rem; }
-.pager-info { font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 /* Phones: each patient is a card; cells show their column's name. */
 @media (max-width: 760px) {
     .table-card { background: none; border: 0; box-shadow: none; overflow: visible; }
@@ -749,8 +751,73 @@ a.block.free:hover .icon { opacity: 1; }
     .data-table td.cell-patient { justify-content: flex-start; padding-block-end: .6rem; margin-block-end: .3rem;
                                   border-block-end: 1px solid var(--line); min-width: 0; }
     .data-table td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: .78rem; font-weight: 600; }
+    .data-table tr.load-more { padding: .6rem .85rem; }
+    .data-table tr.load-more td { display: block; padding: 0; }
+    .sk-tablerow { grid-template-columns: auto minmax(0, 1fr); }
+    .sk-tablerow > .sk-line { display: none; }
     .data-table .num { text-align: start; }
 }
+
+/* ---------- Skeletons and lists that load as you scroll ---------- */
+/* A grey shape with a light sweeping across it, where content is about to appear. */
+.sk { position: relative; display: block; overflow: hidden; border-radius: 6px;
+      background: color-mix(in srgb, var(--line-strong) 45%, var(--sunken)); }
+.sk::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+             background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--surface) 70%, transparent), transparent);
+             animation: shimmer 1.4s ease-in-out infinite; }
+[dir="rtl"] .sk::after { animation-direction: reverse; }
+.sk-line { height: .7rem; width: 100%; }
+.sk-title { height: 1.5rem; width: 45%; border-radius: 8px; }
+.sk-circle { border-radius: 50%; flex: none; }
+.sk-avatar { width: 1.9rem; height: 1.9rem; }
+.sk-avatar-lg { width: 2.6rem; height: 2.6rem; }
+.sk-block { height: 3.2rem; border-radius: 12px; }
+.sk-field { height: 2.6rem; border-radius: 10px; }
+.sk-button { height: 2.2rem; border-radius: 10px; }
+.sk-button.wide { width: 9rem; }
+.sk-pill { height: 2rem; width: 5.5rem; border-radius: 999px; }
+.sk-pill.wide { width: 9rem; margin-inline-start: auto; }
+.sk-lines { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .45rem; }
+.sk-toolbar { display: flex; flex-wrap: wrap; gap: .5rem; }
+.w-10 { width: 10%; } .w-15 { width: 15%; } .w-20 { width: 20%; } .w-25 { width: 25%; } .w-30 { width: 30%; } .w-35 { width: 35%; }
+.w-40 { width: 40%; } .w-45 { width: 45%; } .w-50 { width: 50%; } .w-60 { width: 60%; } .w-70 { width: 70%; } .w-75 { width: 75%; }
+.w-80 { width: 80%; } .w-90 { width: 90%; }
+.skeleton-card { pointer-events: none; }
+.skeleton-card:hover { border-color: var(--line); box-shadow: var(--shadow-1); }
+.sk-card { display: flex; flex-direction: column; gap: .7rem; padding: 1rem 1.1rem; border-radius: var(--radius-lg); background: var(--surface);
+           border: 1px solid var(--line); box-shadow: var(--shadow-1); }
+.sk-card-head { display: flex; align-items: center; gap: .8rem; }
+.sk-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr)); gap: .9rem; }
+.sk-tablerow { display: grid; grid-template-columns: auto minmax(0, 2fr) repeat(3, minmax(0, 1fr)); align-items: center; gap: 1rem;
+               padding: .55rem 0; }
+
+/* The end of a list that loads as you scroll: placeholders, and a link that also works without JavaScript. */
+.people > .load-more { grid-column: 1 / -1; list-style: none; }
+.inbox > .load-more { list-style: none; }
+.load-more { display: flex; flex-direction: column; align-items: center; gap: .6rem; }
+.load-more-skeleton { width: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: .75rem; }
+.load-more-skeleton.stacked { grid-template-columns: 1fr; gap: .6rem; }
+.load-more-link { font-size: .82rem; font-weight: 600; color: var(--muted); text-decoration: none; padding: .3rem .8rem; border-radius: 999px; }
+.load-more-link:hover { background: var(--sunken); color: var(--text); }
+.load-more-link.htmx-request { visibility: hidden; }
+.data-table tr.load-more td { padding: .6rem 1rem .9rem; }
+.data-table tr.load-more:hover td { background: none; }
+
+/* Live search: what's shown dims while the new results load. */
+#patient-results.htmx-request, #op-results.htmx-request { opacity: .5; transition: opacity .15s; pointer-events: none; }
+
+/* Opening another page: its skeleton takes this page's place (app.js adds .navigating). */
+.page-skeleton { display: none; }
+.navigating .content > main { display: none; }
+.navigating .page-skeleton { display: block; animation: fade-in .2s ease; }
+.page-skeleton-inner { display: flex; flex-direction: column; gap: 1rem; }
+.page-skeleton-inner .sk-toolbar { margin-block: .25rem .5rem; }
+
+/* The slide-over while its form loads, and the patient dropdown before its first results. */
+.form-skeleton { display: flex; flex-direction: column; gap: 1rem; padding-block: .5rem; }
+.combo-skeleton { display: none; padding: .45rem .6rem; flex-direction: column; gap: .8rem; }
+.combo.loading .combo-skeleton { display: flex; }
+.combo-skeleton-row { display: flex; align-items: center; gap: .7rem; }
 
 /* ---------- Needs attention ---------- */
 .inbox { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .6rem; }
@@ -843,6 +910,18 @@ a.block.free:hover .icon { opacity: 1; }
 .dayoff { display: flex; align-items: center; gap: .8rem; padding: .6rem .75rem; border-radius: var(--radius); border: 1px solid var(--line); }
 .dayoff .grow { flex: 1; }
 .dayoff form { margin: 0; }
+/* Before closing a day that has bookings: who is booked, then cancel (and message them) or keep. */
+.review-lead { display: flex; align-items: flex-start; gap: .55rem; margin: 0; font-weight: 500; color: var(--warn); }
+.review-lead .icon { flex: none; margin-block-start: .15rem; }
+.review-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .45rem; }
+.review-list li { display: flex; align-items: center; gap: .75rem; padding: .6rem .75rem; border-radius: var(--radius); border: 1px solid var(--line); }
+.review-list .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .1rem; }
+.review-time { flex: none; min-width: 4.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.review-call-note { font-size: .78rem; font-weight: 600; color: var(--danger); }
+.review-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: .9rem; margin-block: 1rem; }
+.review-choice { display: flex; flex-direction: column; align-items: flex-start; gap: .5rem; margin: 0; padding: 1rem;
+                 border-radius: var(--radius-lg); border: 1px solid var(--line); background: var(--surface); }
+.review-choice .hint { margin: 0; }
 .date-chip { width: 2.9rem; flex: none; text-align: center; border-radius: 9px; overflow: hidden; border: 1px solid var(--line);
              line-height: 1.15; background: var(--surface); }
 .date-chip b { display: block; font-size: 1.05rem; padding-block: .15rem; }
@@ -861,9 +940,16 @@ a.block.free:hover .icon { opacity: 1; }
                         display: inline-flex; align-items: center; gap: .35rem; }
 .other-time > summary::-webkit-details-marker { display: none; }
 .other-time[open] > summary { margin-block-end: .6rem; }
-.patient-hint { display: flex; align-items: center; gap: .45rem; min-height: 1.4rem; font-size: .82rem; font-weight: 500; }
+.patient-hint { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; min-height: 1.4rem; font-size: .82rem; font-weight: 500; }
 .patient-hint.known { color: var(--ok); }
 .patient-hint.new { color: var(--info); }
+/* A family on the number: the others, to pick from. */
+.hint-family { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
+.hint-chip { display: inline-flex; align-items: center; gap: .35rem; padding-block: .2rem; padding-inline: .25rem .6rem; border-radius: 999px;
+             border: 1px solid var(--line); background: var(--surface); color: var(--text); font: inherit; font-weight: 500;
+             cursor: pointer; }
+.hint-chip:hover { border-color: var(--brand-600); background: var(--sunken); }
+.avatar.xs { width: 1.35rem; height: 1.35rem; font-size: .58rem; }
 /* Patient dropdown (booking form): a select-like field that opens a searchable list of patients booked before. */
 .combo { position: relative; display: flex; flex-direction: column; gap: .4rem; }
 .combo-field { position: relative; }
@@ -1028,6 +1114,8 @@ a.block.holding { transform: scale(.96); box-shadow: var(--ring); transition: tr
 @keyframes float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -8px; } }
 @keyframes blink { 0%, 80%, 100% { opacity: .3; } 40% { opacity: 1; } }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes shimmer { to { transform: translateX(100%); } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes drawer-in { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes drawer-in-rtl { from { transform: translateX(-40px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
@@ -1055,8 +1143,13 @@ a.block.holding { transform: scale(.96); box-shadow: var(--ring); transition: tr
     .side-nav a > span:not(.nav-badge) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .side-nav a.active::before { display: none; }
     .side-foot { margin: 0; }
-    .account-row { gap: .1rem; }
-    .bell { order: -1; width: 2.5rem; height: 2.5rem; }
+    /* Phones: no bell in the bottom bar; Needs attention is the first item of the account menu. */
+    .bell { display: none; }
+    .menu-panel a.menu-attention { display: flex; }
+    .menu-attention-rule { display: block; }
+    .menu > summary { position: relative; }
+    .avatar-alert { display: block; position: absolute; inset-block-start: .2rem; inset-inline-end: .2rem; width: .65rem; height: .65rem;
+                    border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 2px var(--surface); }
     .menu > summary { padding: .3rem; }
     .menu-who, .menu > summary > .icon { display: none; }
     .menu-panel { inset-inline: auto 0; width: 240px; }

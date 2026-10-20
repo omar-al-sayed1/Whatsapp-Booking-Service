@@ -206,7 +206,12 @@
         }
         event.preventDefault();
         const body = document.getElementById("drawer-body");
-        body.innerHTML = '<div class="drawer-loading"><span class="spinner"></span></div>';
+        const skeleton = document.getElementById("drawer-skeleton");
+        if (skeleton) {
+            body.replaceChildren(skeleton.content.cloneNode(true));
+        } else {
+            body.innerHTML = '<div class="drawer-loading"><span class="spinner"></span></div>';
+        }
         if (!drawer.open) {
             drawer.showModal();
         }
@@ -555,6 +560,7 @@
         trigger.setAttribute("aria-expanded", "true");
         search.focus();
         if (!combo.querySelector("#patient-results > *")) {
+            combo.classList.add("loading");
             window.htmx?.trigger(search, "combo-open");
         }
     }
@@ -608,13 +614,16 @@
         const phone = form.querySelector("[name=phone]");
         phone.value = option.dataset.phone;
         showChosen(combo, {name: option.dataset.name, phone: option.dataset.phone, avatar: option.querySelector(".avatar")});
+        // Either may have changed (a family shares a phone); the hint is asked again for one that did.
         phone.dispatchEvent(new Event("input", {bubbles: true}));
+        form.querySelector("[name=name]").dispatchEvent(new Event("input", {bubbles: true}));
         closeCombo(combo, false);
         form.querySelector("button[type=submit]")?.focus();
     }
 
     /* Marks what was typed in the names found, and makes the first one the one Enter picks. */
     function refreshComboResults(combo) {
+        combo.classList.remove("loading");
         const query = comboParts(combo).search.value.trim().toLocaleLowerCase();
         combo.querySelectorAll("[data-hl]").forEach(name => {
             const text = name.textContent;
@@ -651,6 +660,23 @@
             phone.dispatchEvent(new Event("input", {bubbles: true}));
             trigger.focus();
         }
+    });
+
+    // A family member offered under the phone field: picked like an option of the dropdown.
+    document.addEventListener("click", event => {
+        const chip = event.target.closest("[data-fill-patient]");
+        const form = chip?.closest("form");
+        if (!form) {
+            return;
+        }
+        form.querySelector("[name=name]").value = chip.dataset.name;
+        form.querySelectorAll("[name=language]").forEach(radio => (radio.checked = radio.value === chip.dataset.language));
+        const combo = form.querySelector("[data-combo]");
+        if (combo) {
+            showChosen(combo, {name: chip.dataset.name, phone: chip.dataset.phone, avatar: chip.querySelector(".avatar")});
+        }
+        // The name changed, not the phone: htmx only asks again for a field whose value changed.
+        form.querySelector("[name=name]").dispatchEvent(new Event("input", {bubbles: true}));
     });
 
     // Keeps the focus in the search box while an option is clicked (some browsers would move it away).
@@ -742,6 +768,35 @@
         document.querySelectorAll(`[data-preview-line="${name}"]`).forEach(line => (line.hidden = !field.value.trim()));
         const anyFilled = [...document.querySelectorAll("[data-preview]")].some(other => other.value.trim());
         document.querySelectorAll("[data-preview-empty]").forEach(empty => (empty.hidden = anyFilled));
+    });
+
+    /*
+     * Opening another page from a link: if it takes more than a moment, a skeleton of a page takes the
+     * place of this one, so nothing looks stuck; the new page replaces it when it arrives. Links that
+     * something else already handles (the slide-over, htmx, the day strip) are left alone.
+     */
+    let navigatingTimer = 0;
+    document.addEventListener("click", event => {
+        const link = event.target.closest("a[href]");
+        if (!link || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey
+            || event.altKey || link.target || link.hasAttribute("download")) {
+            return;
+        }
+        const url = new URL(link.href, location.href);
+        const samePage = url.pathname === location.pathname && url.search === location.search;
+        if (url.origin !== location.origin || samePage) {
+            return;
+        }
+        clearTimeout(navigatingTimer);
+        navigatingTimer = setTimeout(() => {
+            document.body.classList.add("navigating");
+            window.scrollTo(0, 0);
+        }, 120);
+    });
+    // Back to a page the browser kept (Back button): it shows as it was.
+    window.addEventListener("pageshow", () => {
+        clearTimeout(navigatingTimer);
+        document.body.classList.remove("navigating");
     });
 
     /* A GET filter form with data-clean-query leaves its empty fields out of the address htmx pushes. */

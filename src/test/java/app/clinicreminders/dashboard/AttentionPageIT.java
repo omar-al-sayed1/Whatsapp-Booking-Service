@@ -14,6 +14,9 @@ import app.clinicreminders.clinic.Clinic;
 import app.clinicreminders.common.Language;
 import app.clinicreminders.patient.Patient;
 import app.clinicreminders.staff.StaffPrincipal;
+import app.clinicreminders.whatsapp.MessageKind;
+import app.clinicreminders.whatsapp.MessageLog;
+import app.clinicreminders.whatsapp.MessageLogRepository;
 import app.clinicreminders.whatsapp.OutboundMessage.TemplateMessage;
 import app.clinicreminders.whatsapp.WhatsAppException;
 import app.clinicreminders.whatsapp.WhatsAppMessenger;
@@ -28,6 +31,9 @@ class AttentionPageIT extends DashboardTest {
 
     @Autowired
     WhatsAppMessenger messenger;
+
+    @Autowired
+    MessageLogRepository logs;
 
     private Clinic clinic;
     private Patient rana;
@@ -78,10 +84,32 @@ class AttentionPageIT extends DashboardTest {
 
         assertThat(get(staff, "/")).bodyText()
                 .contains("class=\"bell has-alerts\" href=\"/attention\"", "aria-label=\"Needs attention (1)\"")
-                .doesNotContain("<span>Needs attention</span>");
+                .as("on phones: the first item of the account menu, and a dot on the avatar")
+                .contains("class=\"menu-attention\" href=\"/attention\"", "class=\"avatar-alert\"");
         assertThat(get(staff, "/attention")).bodyText()
                 .contains("class=\"bell active has-alerts\" href=\"/attention\"",
-                        "aria-label=\"Needs attention (1)\" aria-current=\"page\"");
+                        "aria-label=\"Needs attention (1)\" aria-current=\"page\"",
+                        "class=\"menu-attention active\" href=\"/attention\"");
+    }
+
+    @Test
+    void withNothingWaitingTheAvatarHasNoDot() {
+        assertThat(get(staff, "/")).bodyText()
+                .contains("class=\"menu-attention\" href=\"/attention\"")
+                .doesNotContain("class=\"avatar-alert\"", "has-alerts");
+    }
+
+    @Test
+    void failedMessagesLoadTwentyAtATimeAsYouScroll() {
+        for (int i = 0; i < 25; i++) {
+            logs.save(MessageLog.failed(clinic.getId(), null, MessageKind.TEMPLATE, "appointment_reminder", 131000 + i, "Failure " + i));
+        }
+
+        assertThat(get(staff, "/attention")).bodyText()
+                .contains(">25<", "hx-get=\"/attention?failedPage=2\"").doesNotContain("Failure 0 (131000)");
+        assertThat(get(staff, "/attention?failedPage=2").header("HX-Request", "true")).bodyText()
+                .as("the newest come first; page 2 has the oldest five").contains("Failure 0 (131000)", "Failure 4 (131004)")
+                .doesNotContain("<html", "Failure 5 (131005)", "failedPage=3");
     }
 
     @Test

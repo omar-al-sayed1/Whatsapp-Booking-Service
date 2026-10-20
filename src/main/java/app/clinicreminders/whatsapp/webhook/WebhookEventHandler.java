@@ -2,6 +2,7 @@ package app.clinicreminders.whatsapp.webhook;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import app.clinicreminders.clinic.Clinic;
@@ -24,7 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Applies one webhook delivery inside the inbox processor's transaction: routes each change to its
  * clinic, logs and dedupes inbound messages, handles STOP, publishes {@link InboundMessageReceived}
- * and applies delivery statuses.
+ * and applies delivery statuses. A number may belong to several patients (a family): STOP opts
+ * them all out, and they all get its WhatsApp user id.
  */
 @Component
 public class WebhookEventHandler {
@@ -71,20 +73,20 @@ public class WebhookEventHandler {
             log.debug("Duplicate delivery of {} ignored", message.waMessageId());
             return;
         }
-        Patient patient = findPatient(clinicId, message.phoneE164(), message.userId()).orElse(null);
-        if (patient != null && message.userId() != null) {
-            linkUser(clinicId, patient, message.userId());
+        List<Patient> household = findHousehold(clinicId, message.phoneE164(), message.userId());
+        if (message.userId() != null) {
+            linkUser(clinicId, household, message.userId());
         }
         if (message.content() instanceof Text text && OptOutWords.isOptOut(text.body())) {
-            optOut(clinic, patient, message, text.body());
+            optOut(clinic, household, message, text.body());
             return;
         }
-        events.publishEvent(new InboundMessageReceived(clinicId, patient == null ? null : patient.getId(),
+        events.publishEvent(new InboundMessageReceived(clinicId, household.isEmpty() ? null : household.getFirst().getId(),
                 logId.get(), message));
     }
 
-    private void optOut(Clinic clinic, @Nullable Patient patient, InboundMessage message, String body) {
-        if (patient == null) {
+    private void optOut(Clinic clinic, List<Patient> household, InboundMessage message, String body) {
+        if (household.isEmpty()) {
             if (message.phoneE164() == null) {
                 // We only ever message by phone number, and we don't have theirs.
                 log.warn("Clinic {}: opt-out from a user whose number Meta didn't share", clinic.getId());
@@ -92,14 +94,17 @@ public class WebhookEventHandler {
             }
             Language language = OptOutWords.isArabic(body) ? Language.AR : clinic.getDefaultLanguage();
             String name = message.profileName() != null ? message.profileName() : message.phoneE164();
-            patient = new Patient(clinic.getId(), name, message.phoneE164(), language);
+            Patient patient = new Patient(clinic.getId(), name, message.phoneE164(), language);
             if (message.userId() != null) {
                 patient.linkWhatsAppUser(message.userId());
             }
+            household = List.of(patient);
         }
-        patient.optOut();
-        patients.save(patient);
-        log.info("Clinic {}: patient {} opted out", clinic.getId(), patient.getId());
+        for (Patient patient : household) {
+            patient.optOut();
+            patients.save(patient);
+            log.info("Clinic {}: patient {} opted out", clinic.getId(), patient.getId());
+        }
     }
 
     private void onStatus(long clinicId, StatusUpdate update) {
@@ -118,30 +123,37 @@ public class WebhookEventHandler {
                 },
                 () -> log.debug("Status for unknown message {} ignored", update.waMessageId()));
         if (update.recipientPhoneE164() != null && update.recipientUserId() != null) {
-            patients.findByClinicIdAndPhoneE164(clinicId, update.recipientPhoneE164())
-                    .ifPresent(patient -> linkUser(clinicId, patient, update.recipientUserId()));
+            linkUser(clinicId, patients.findByClinicIdAndPhoneE164OrderById(clinicId, update.recipientPhoneE164()),
+                    update.recipientUserId());
         }
     }
 
-    private Optional<Patient> findPatient(long clinicId, @Nullable String phone, @Nullable String userId) {
-        Optional<Patient> byPhone = phone == null ? Optional.empty() : patients.findByClinicIdAndPhoneE164(clinicId, phone);
-        if (byPhone.isPresent() || userId == null) {
+    /** The patients on the sender's number or, when Meta hides it, with their WhatsApp user id. */
+    private List<Patient> findHousehold(long clinicId, @Nullable String phone, @Nullable String userId) {
+        List<Patient> byPhone = phone == null ? List.of() : patients.findByClinicIdAndPhoneE164OrderById(clinicId, phone);
+        if (!byPhone.isEmpty() || userId == null) {
             return byPhone;
         }
-        return patients.findByClinicIdAndWaUserId(clinicId, userId);
+        return patients.findByClinicIdAndWaUserIdOrderById(clinicId, userId);
     }
 
-    /** Skips the link if another patient of the clinic already has this id, rather than fail the delivery. */
-    private void linkUser(long clinicId, Patient patient, String userId) {
-        if (userId.equals(patient.getWaUserId())) {
+    /**
+     * Gives the number's patients this id. Skipped if a patient on another number already has it,
+     * rather than fail the delivery.
+     */
+    private void linkUser(long clinicId, List<Patient> household, String userId) {
+        if (household.isEmpty() || household.stream().allMatch(patient -> userId.equals(patient.getWaUserId()))) {
             return;
         }
-        Optional<Patient> holder = patients.findByClinicIdAndWaUserId(clinicId, userId);
-        if (holder.isPresent() && !holder.get().getId().equals(patient.getId())) {
-            log.warn("Clinic {}: WhatsApp user id already belongs to patient {}, not linking to {}",
-                    clinicId, holder.get().getId(), patient.getId());
+        String phone = household.getFirst().getPhoneE164();
+        Optional<Patient> holder = patients.findByClinicIdAndWaUserIdOrderById(clinicId, userId).stream()
+                .filter(patient -> !patient.getPhoneE164().equals(phone))
+                .findFirst();
+        if (holder.isPresent()) {
+            log.warn("Clinic {}: WhatsApp user id already belongs to patient {}, not linking to the patients of another number",
+                    clinicId, holder.get().getId());
             return;
         }
-        patient.linkWhatsAppUser(userId);
+        household.forEach(patient -> patient.linkWhatsAppUser(userId));
     }
 }

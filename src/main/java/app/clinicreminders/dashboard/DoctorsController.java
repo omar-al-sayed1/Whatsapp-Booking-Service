@@ -12,9 +12,12 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import app.clinicreminders.appointment.Appointment;
 import app.clinicreminders.appointment.AppointmentRepository;
 import app.clinicreminders.common.NotFoundException;
 import app.clinicreminders.dashboard.ClinicContext.Ctx;
+import app.clinicreminders.patient.Patient;
+import app.clinicreminders.patient.PatientRepository;
 import app.clinicreminders.scheduling.Doctor;
 import app.clinicreminders.scheduling.DoctorRepository;
 import app.clinicreminders.scheduling.ScheduleExceptionRepository;
@@ -42,6 +45,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * with a login if asked; each doctor's page has their name, weekly hours, days off and login. The
  * appointment length is the clinic's, set by the operator. A doctor's own login gets only their own
  * page, to change their hours and days off ("My hours"); the rest is the front desk's (SecurityConfig).
+ *
+ * <p>A day off or special hours that leave out patients already booked go through a review page
+ * first: it lists them, and the appointments are cancelled (the patients are messaged) or kept.
  */
 @Controller
 class DoctorsController {
@@ -57,6 +63,10 @@ class DoctorsController {
     }
 
     record DayOffRow(Long id, String date, String hours, String dayOfMonth, String month) {
+    }
+
+    /** An appointment a day change would leave out, as the review lists it; no patient if they were deleted. */
+    record LeftOutRow(String time, @Nullable String patient, @Nullable String phone, boolean optedOut) {
     }
 
     /** A doctor in the list, with the weekdays they have hours on. */
@@ -78,10 +88,13 @@ class DoctorsController {
     private final ScheduleRuleRepository rules;
     private final ScheduleExceptionRepository exceptions;
     private final AppointmentRepository appointments;
+    private final DayChanges dayChanges;
+    private final PatientRepository patients;
 
     DoctorsController(ClinicContext context, ScheduleSettings scheduleSettings, DoctorSetup doctorSetup,
                       StaffAccounts accounts, DoctorRepository doctors, ScheduleRuleRepository rules,
-                      ScheduleExceptionRepository exceptions, AppointmentRepository appointments) {
+                      ScheduleExceptionRepository exceptions, AppointmentRepository appointments,
+                      DayChanges dayChanges, PatientRepository patients) {
         this.context = context;
         this.scheduleSettings = scheduleSettings;
         this.doctorSetup = doctorSetup;
@@ -90,6 +103,8 @@ class DoctorsController {
         this.rules = rules;
         this.exceptions = exceptions;
         this.appointments = appointments;
+        this.dayChanges = dayChanges;
+        this.patients = patients;
     }
 
     /** For a doctor's login, their own page. */
@@ -284,27 +299,90 @@ class DoctorsController {
         return "redirect:/doctors/" + id;
     }
 
+    /**
+     * Saves a day off or special hours. When patients are booked in the hours it takes away, nothing
+     * changes until {@code appointments} says what happens to them: "cancel" (they are messaged to
+     * book another time) or "keep"; without it, the review page lists them first.
+     */
     @PostMapping("/doctors/{id}/days")
     String setDay(@PathVariable long id, @AuthenticationPrincipal StaffPrincipal staff, HttpServletRequest request,
                   RedirectAttributes redirect,
                   @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                   @RequestParam(defaultValue = "false") boolean closed,
                   @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime start,
-                  @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime end) {
+                  @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime end,
+                  @RequestParam(defaultValue = "") String appointments) {
         Ctx ctx = context.of(staff, request);
         ctx.requireSees(id, "Doctor", id);
-        if (!closed && (start == null || end == null)) {
+        TimeWindow hours;
+        try {
+            hours = dayHours(closed, start, end);
+        } catch (IllegalArgumentException e) {
             redirect.addFlashAttribute("error", "error.hours");
             return "redirect:/doctors/" + id;
         }
+        boolean cancel = appointments.equals("cancel");
+        boolean decided = cancel || appointments.equals("keep");
+        List<Appointment> leftOut = dayChanges.leftOut(ctx.clinicId(), id, date, hours, ctx.zone(), ctx.now());
+        if (!leftOut.isEmpty() && !decided) {
+            redirect.addAttribute("date", date);
+            redirect.addAttribute("closed", closed);
+            if (hours != null) {
+                redirect.addAttribute("start", hours.start().toString());
+                redirect.addAttribute("end", hours.end().toString());
+            }
+            return "redirect:/doctors/" + id + "/days/review";
+        }
+        int cancelled = dayChanges.apply(ctx.clinicId(), id, date, hours, cancel, ctx.zone(), ctx.now());
+        redirect.addFlashAttribute("notice", leftOut.isEmpty() ? "notice.saved"
+                : cancelled > 0 ? "notice.day-cancelled" : "notice.day-kept");
+        return "redirect:/doctors/" + id;
+    }
+
+    /** Before a day change that leaves out booked patients: who they are, and cancel or keep their appointments. */
+    @GetMapping("/doctors/{id}/days/review")
+    String reviewDay(@PathVariable long id, @AuthenticationPrincipal StaffPrincipal staff, HttpServletRequest request,
+                     Model model, RedirectAttributes redirect,
+                     @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                     @RequestParam(defaultValue = "false") boolean closed,
+                     @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime start,
+                     @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime end) {
+        Ctx ctx = context.of(staff, request);
+        Doctor doctor = doctor(ctx, id);
+        TimeWindow hours;
         try {
-            TimeWindow hours = closed ? null : new TimeWindow(start, end);
-            scheduleSettings.setDay(ctx.clinicId(), id, date, hours);
-            redirect.addFlashAttribute("notice", "notice.saved");
+            hours = dayHours(closed, start, end);
         } catch (IllegalArgumentException e) {
             redirect.addFlashAttribute("error", "error.hours");
+            return "redirect:/doctors/" + id;
         }
-        return "redirect:/doctors/" + id;
+        model.addAttribute("doctor", doctor);
+        model.addAttribute("date", date);
+        model.addAttribute("dateLabel", ctx.formats().date(date));
+        model.addAttribute("closed", hours == null);
+        model.addAttribute("start", hours == null ? null : hours.start());
+        model.addAttribute("end", hours == null ? null : hours.end());
+        model.addAttribute("hoursLabel", hours == null ? null : hours(ctx, hours));
+        model.addAttribute("leftOut", dayChanges.leftOut(ctx.clinicId(), id, date, hours, ctx.zone(), ctx.now()).stream()
+                .map(a -> {
+                    Patient patient = a.getPatientId() == null ? null
+                            : patients.findByIdAndClinicId(a.getPatientId(), ctx.clinicId()).orElse(null);
+                    return new LeftOutRow(ctx.formats().time(a.getStartsAt()), patient == null ? null : patient.getName(),
+                            patient == null ? null : patient.getPhoneE164(), patient != null && patient.isOptedOut());
+                })
+                .toList());
+        return "dashboard/day-review";
+    }
+
+    /** Null for a day off; the special hours otherwise. */
+    private static @Nullable TimeWindow dayHours(boolean closed, @Nullable LocalTime start, @Nullable LocalTime end) {
+        if (closed) {
+            return null;
+        }
+        if (start == null || end == null) {
+            throw new IllegalArgumentException("Special hours need a start and an end");
+        }
+        return new TimeWindow(start, end);
     }
 
     /** As for hours: only that doctor's day, in the user's clinic. */

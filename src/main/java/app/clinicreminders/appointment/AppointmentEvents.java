@@ -16,6 +16,13 @@ public final class AppointmentEvents {
     public record Cancelled(long clinicId, long appointmentId, CancelledBy by) {
     }
 
+    /**
+     * Cancelled by the clinic because the doctor won't be there (a day off, or shorter hours that
+     * day): the patient is told and offered another time. Published after {@link Cancelled}.
+     */
+    public record CancelledDoctorAway(long clinicId, long appointmentId) {
+    }
+
     public enum CancelledBy {
         PATIENT,
         STAFF

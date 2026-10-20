@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 import app.clinicreminders.common.Language;
+import app.clinicreminders.patient.Patient;
 import app.clinicreminders.scheduling.Doctor;
 import app.clinicreminders.whatsapp.OutboundMessage.ListMessage;
 import app.clinicreminders.whatsapp.OutboundMessage.ListRow;
@@ -23,7 +24,7 @@ import org.springframework.stereotype.Component;
 /**
  * Builds the booking flow's screens in the patient's language. Reply and row ids are what
  * {@link BookingFlow} reads back from the tap: {@code menu:book}, {@code doctor:12},
- * {@code day:2026-11-03}, {@code slot:<epoch second>}, {@code slots:more}, {@code confirm:yes},
+ * {@code day:2026-11-03}, {@code slot:<epoch second>}, {@code slots:more}, {@code confirm:patient:7},
  * {@code mine:cancel:45}...
  */
 @Component
@@ -31,6 +32,14 @@ class BookingMessages {
 
     /** Meta's limit on a list row title. */
     private static final int ROW_TITLE = 24;
+    /** Meta's limit on a list row description. */
+    private static final int ROW_DESCRIPTION = 72;
+    /** The confirmation's other rows (someone else, another time, don't book) leave room for this many patients. */
+    static final int MAX_PATIENT_ROWS = 7;
+
+    /** An appointment to come under "My appointment"; {@code patient} is named when a family shares the number. */
+    record Upcoming(long appointmentId, @Nullable String patient, String doctor, Instant startsAt) {
+    }
 
     private final MessageSource messages;
 
@@ -86,17 +95,40 @@ class BookingMessages {
                 text("booking.slot.button", language), text("booking.slot.section", language), rows);
     }
 
-    /** Confirm / Another time / Cancel. */
-    ReplyButtonsMessage confirm(String to, Language language, String doctor, Instant startsAt, ZoneId zone) {
-        return new ReplyButtonsMessage(to, text("booking.confirm.body", language, doctor,
-                date(startsAt.atZone(zone), language), time(startsAt, zone, language)),
-                List.of(button("confirm:yes", "booking.confirm.yes", language),
-                        button("confirm:other", "booking.confirm.other", language),
-                        button("confirm:cancel", "booking.confirm.cancel", language)));
+    /**
+     * Who the appointment is for: the patients on this number (a family shares one), or for a new
+     * number its WhatsApp profile name; then Someone else, Another time and Don't book.
+     *
+     * @param household   the number's patients, at most {@link #MAX_PATIENT_ROWS}
+     * @param profileName the sender's WhatsApp name, offered when the number has no patient yet
+     */
+    ListMessage confirm(String to, Language language, String doctor, Instant startsAt, ZoneId zone,
+                        List<Patient> household, @Nullable String profileName) {
+        List<ListRow> rows = new ArrayList<>();
+        for (Patient patient : household) {
+            rows.add(new ListRow("confirm:patient:" + patient.getId(), fit(patient.getName()), null));
+        }
+        if (household.isEmpty()) {
+            boolean named = profileName != null && !profileName.isBlank();
+            rows.add(new ListRow("confirm:me", named ? fit(profileName.strip()) : text("booking.confirm.me", language),
+                    named ? text("booking.confirm.me", language) : null));
+        }
+        rows.add(new ListRow("confirm:new", text("booking.confirm.someone-else", language),
+                text("booking.confirm.someone-else.hint", language)));
+        rows.add(new ListRow("confirm:other", text("booking.confirm.other", language), null));
+        rows.add(new ListRow("confirm:cancel", text("booking.confirm.cancel", language), null));
+        return new ListMessage(to, text("booking.confirm.body", language, doctor, date(startsAt.atZone(zone), language),
+                time(startsAt, zone, language)), text("booking.confirm.button", language),
+                text("booking.confirm.section", language), rows);
     }
 
-    TextMessage booked(String to, Language language, String doctor, Instant startsAt, ZoneId zone) {
-        return new TextMessage(to, text("booking.booked", language, doctor, date(startsAt.atZone(zone), language),
+    /** After Someone else: the patient's name, typed. */
+    TextMessage askName(String to, Language language) {
+        return new TextMessage(to, text("booking.name.ask", language));
+    }
+
+    TextMessage booked(String to, Language language, String patient, String doctor, Instant startsAt, ZoneId zone) {
+        return new TextMessage(to, text("booking.booked", language, patient, doctor, date(startsAt.atZone(zone), language),
                 time(startsAt, zone, language)));
     }
 
@@ -114,13 +146,30 @@ class BookingMessages {
         return new TextMessage(to, text("booking.no-free-days", language));
     }
 
-    /** The next appointment, with Cancel it / Keep it. */
-    ReplyButtonsMessage myAppointment(String to, Language language, String doctor, Instant startsAt, ZoneId zone,
-                                      long appointmentId) {
-        return new ReplyButtonsMessage(to, text("booking.mine.body", language, doctor,
-                date(startsAt.atZone(zone), language), time(startsAt, zone, language)),
-                List.of(button("mine:cancel:" + appointmentId, "booking.mine.cancel", language),
+    /** One appointment to come, with Cancel it / Keep it. */
+    ReplyButtonsMessage myAppointment(String to, Language language, Upcoming appointment, ZoneId zone) {
+        String date = date(appointment.startsAt().atZone(zone), language);
+        String time = time(appointment.startsAt(), zone, language);
+        String body = appointment.patient() == null
+                ? text("booking.mine.body", language, appointment.doctor(), date, time)
+                : text("booking.mine.body-for", language, appointment.patient(), appointment.doctor(), date, time);
+        return new ReplyButtonsMessage(to, body,
+                List.of(button("mine:cancel:" + appointment.appointmentId(), "booking.mine.cancel", language),
                         button("mine:keep", "booking.mine.keep", language)));
+    }
+
+    /** Several appointments to come (at most 10): picking one shows it with Cancel it / Keep it. */
+    ListMessage myAppointments(String to, Language language, List<Upcoming> appointments, ZoneId zone) {
+        List<ListRow> rows = appointments.stream()
+                .map(a -> {
+                    String details = time(a.startsAt(), zone, language) + " · " + a.doctor()
+                            + (a.patient() == null ? "" : " · " + a.patient());
+                    return new ListRow("mine:show:" + a.appointmentId(), fit(date(a.startsAt().atZone(zone), language)),
+                            details.length() <= ROW_DESCRIPTION ? details : details.substring(0, ROW_DESCRIPTION - 1).strip() + "…");
+                })
+                .toList();
+        return new ListMessage(to, text("booking.mine.list", language), text("booking.mine.button", language),
+                text("booking.mine.section", language), rows);
     }
 
     /** The clinic's address and opening hours from Settings, whichever are filled in. */
@@ -155,7 +204,7 @@ class BookingMessages {
         return DateTimeFormatter.ofPattern(text(patternKey, language), language.locale()).format(value);
     }
 
-    /** Doctor names and long dates are cut to fit a list row. */
+    /** Doctor and patient names and long dates are cut to fit a list row. */
     static String fit(String title) {
         return title.length() <= ROW_TITLE ? title : title.substring(0, ROW_TITLE - 1).strip() + "…";
     }

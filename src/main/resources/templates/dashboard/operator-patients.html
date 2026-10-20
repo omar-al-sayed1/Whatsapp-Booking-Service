@@ -17,7 +17,7 @@
     */-->
     <form method="get" th:action="@{/operator/patients}" class="card filter-panel" role="search"
           th:hx-get="@{/operator/patients}" hx-trigger="input delay:250ms, search" hx-target="#op-results"
-          hx-select="#op-results" hx-swap="outerHTML" hx-push-url="true" hx-indicator=".filter-search" data-clean-query>
+          hx-select="#op-results" hx-swap="outerHTML" hx-push-url="true" hx-indicator=".filter-search, #op-results" data-clean-query>
         <div class="big-search filter-search">
             <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
             <input type="search" name="q" th:value="${q}" th:placeholder="#{operator.patients.search}"
@@ -101,6 +101,8 @@
                 </tr>
                 </thead>
                 <tbody>
+                <!--/* "rows" is also what the next page brings as you scroll: its rows, then the loader for the page after. */-->
+                <th:block th:fragment="rows">
                 <tr th:each="r : ${rows}">
                     <td class="cell-patient">
                         <span class="avatar sm" th:style="'--hue:' + ${@avatars.hue(r.name())}" th:text="${@avatars.initials(r.name())}">RH</span>
@@ -123,17 +125,20 @@
                     <td class="num" th:attr="data-label=#{operator.patients.col.appointments}" th:text="${r.appointments()}">4</td>
                     <td class="muted" th:attr="data-label=#{operator.patients.col.added}" th:text="${r.added()}">Mon 2 Feb</td>
                 </tr>
+                <tr class="load-more" th:if="${nextUrl}">
+                    <td colspan="6">
+                        <div class="load-more-skeleton stacked">
+                            <th:block th:each="i : ${#numbers.sequence(1, 3)}"><div th:replace="~{dashboard/skeletons :: table-row}"></div></th:block>
+                        </div>
+                        <a class="load-more-link" th:href="${nextUrl}" th:hx-get="${nextUrl}" hx-trigger="intersect once, click"
+                           hx-target="closest tr" hx-swap="outerHTML" th:text="#{list.load-more}">Show more</a>
+                    </td>
+                </tr>
+                </th:block>
                 </tbody>
             </table>
         </div>
 
-        <nav class="pager" th:if="${pages > 1}" th:aria-label="#{operator.patients.pages}">
-            <a class="button sm" th:if="${previousUrl}" th:href="${previousUrl}">
-                <svg class="icon flip-rtl" aria-hidden="true"><use href="#i-chevron-left"/></svg><span th:text="#{operator.patients.previous}">Previous</span></a>
-            <span class="pager-info" th:text="#{operator.patients.page(${page + ''}, ${pages + ''})}">Page 1 of 4</span>
-            <a class="button sm" th:if="${nextUrl}" th:href="${nextUrl}">
-                <span th:text="#{operator.patients.next}">Next</span><svg class="icon flip-rtl" aria-hidden="true"><use href="#i-chevron-right"/></svg></a>
-        </nav>
     </section>
 </main>
 </body>

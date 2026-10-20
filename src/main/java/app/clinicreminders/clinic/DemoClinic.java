@@ -69,6 +69,8 @@ public class DemoClinic {
 
     private static final List<DemoPatient> PATIENTS = List.of(
             new DemoPatient("رنا حداد", "+96170990001", Language.AR),
+            // Her son, on her phone: a family shares a number.
+            new DemoPatient("يوسف حداد", "+96170990001", Language.AR),
             new DemoPatient("جورج معلوف", "+96170990002", Language.AR),
             new DemoPatient("ليلى سكاف", "+96170990003", Language.AR),
             new DemoPatient("مارون عازار", "+96170990004", Language.AR),

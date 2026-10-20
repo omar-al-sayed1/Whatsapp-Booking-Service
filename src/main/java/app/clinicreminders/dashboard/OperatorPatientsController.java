@@ -26,14 +26,16 @@ import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * The operator's Patients page: every clinic's patients, searched and filtered (clinic, language,
- * upcoming appointment, last appointment, opted out), sorted and paged. The filters live in the URL,
- * so a filtered list can be bookmarked or shared; results update as you type (htmx).
+ * upcoming appointment, last appointment, opted out) and sorted. The filters live in the URL, so a
+ * filtered list can be bookmarked or shared; results update as you type, and more load as you
+ * scroll (htmx: later pages come back as rows only, to append).
  */
 @Controller
 @RequestMapping("/operator/patients")
@@ -69,7 +71,8 @@ class OperatorPatientsController {
                     @RequestParam(defaultValue = "") String last,
                     @RequestParam(name = "messages", defaultValue = "") String reach,
                     @RequestParam(defaultValue = "") String sort,
-                    @RequestParam(defaultValue = "1") int page) {
+                    @RequestParam(defaultValue = "1") int page,
+                    @RequestHeader(name = "HX-Request", required = false) String htmx) {
         Language viewer = StaffLocaleResolver.language(request);
         Locale locale = viewer.locale();
         List<Clinic> all = clinics.all();
@@ -95,8 +98,10 @@ class OperatorPatientsController {
         model.addAttribute("total", found.total());
         model.addAttribute("page", found.page());
         model.addAttribute("pages", found.pages());
-        model.addAttribute("previousUrl", found.page() > 1 ? withPage(request, found.page() - 1) : null);
         model.addAttribute("nextUrl", found.page() < found.pages() ? withPage(request, found.page() + 1) : null);
+        if ("true".equals(htmx) && page > 1) {
+            return "dashboard/operator-patients :: rows"; // the next rows, as you scroll
+        }
         model.addAttribute("clinics", all);
         model.addAttribute("filter", filter);
         model.addAttribute("q", q);

@@ -10,7 +10,6 @@ import app.clinicreminders.clinic.Clinic;
 import app.clinicreminders.clinic.ClinicRepository;
 import app.clinicreminders.common.NotFoundException;
 import app.clinicreminders.common.Sleeper;
-import app.clinicreminders.patient.Patient;
 import app.clinicreminders.patient.PatientRepository;
 import app.clinicreminders.whatsapp.OutboundMessage.ListMessage;
 import app.clinicreminders.whatsapp.OutboundMessage.ReplyButtonsMessage;
@@ -71,7 +70,7 @@ public class WhatsAppMessenger {
      */
     public SendOutcome send(long clinicId, OutboundMessage message, @Nullable Long appointmentId) {
         Clinic clinic = clinics.findById(clinicId).orElseThrow(() -> new NotFoundException("Clinic", clinicId));
-        if (patients.findByClinicIdAndPhoneE164(clinicId, message.to()).filter(Patient::isOptedOut).isPresent()) {
+        if (patients.existsByClinicIdAndPhoneE164AndOptedOutTrue(clinicId, message.to())) {
             log.info("Not messaging an opted-out patient of clinic {}", clinicId);
             return new SendOutcome(Result.OPTED_OUT, null, null, null, null);
         }

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<!--/*
+  Skeletons: grey shapes that shimmer where content is about to appear, so a page or list never looks
+  stuck while it loads. Hidden from screen readers (aria-hidden); the real content announces itself.
+*/-->
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* A patient card (Patients), while more load as you scroll. */-->
+<div th:fragment="person" class="person skeleton-card" aria-hidden="true">
+    <div class="person-head">
+        <span class="sk sk-circle sk-avatar-lg"></span>
+        <span class="sk-lines"><span class="sk sk-line w-60"></span><span class="sk sk-line w-40"></span></span>
+    </div>
+    <span class="sk sk-block"></span>
+    <div class="person-actions"><span class="sk sk-button"></span><span class="sk sk-button"></span></div>
+</div>
+
+<!--/* An item of a Needs attention list. */-->
+<div th:fragment="inbox" class="inbox-item skeleton-card" aria-hidden="true">
+    <span class="sk sk-circle sk-avatar-lg"></span>
+    <span class="sk-lines"><span class="sk sk-line w-50"></span><span class="sk sk-line w-75"></span><span class="sk sk-line w-35"></span></span>
+</div>
+
+<!--/* A row of the operator's patients table, inside the loader row at its end. */-->
+<div th:fragment="table-row" class="sk-tablerow" aria-hidden="true">
+    <span class="sk sk-circle sk-avatar"></span>
+    <span class="sk-lines"><span class="sk sk-line w-60"></span><span class="sk sk-line w-35"></span></span>
+    <span class="sk sk-line"></span>
+    <span class="sk sk-line"></span>
+    <span class="sk sk-line"></span>
+</div>
+
+<!--/* A page on its way (shown at once when you open another page from the menu). */-->
+<div th:fragment="page" class="container page-skeleton-inner" aria-hidden="true">
+    <span class="sk sk-line w-15"></span>
+    <span class="sk sk-title"></span>
+    <div class="sk-toolbar"><span class="sk sk-pill"></span><span class="sk sk-pill"></span><span class="sk sk-pill wide"></span></div>
+    <div class="sk-cards">
+        <div class="skeleton-card sk-card" th:each="i : ${#numbers.sequence(1, 3)}">
+            <div class="sk-card-head"><span class="sk sk-circle sk-avatar-lg"></span>
+                <span class="sk-lines"><span class="sk sk-line w-50"></span><span class="sk sk-line w-30"></span></span></div>
+            <span class="sk sk-line w-90"></span>
+            <span class="sk sk-line w-75"></span>
+            <span class="sk sk-line w-60"></span>
+        </div>
+    </div>
+</div>
+
+<!--/* A form in the slide-over, while it loads. */-->
+<div th:fragment="form" class="form-skeleton" aria-hidden="true">
+    <span class="sk sk-line w-20"></span>
+    <span class="sk sk-title"></span>
+    <div class="skeleton-card sk-card" th:each="i : ${#numbers.sequence(1, 2)}">
+        <span class="sk sk-line w-30"></span>
+        <span class="sk sk-field"></span>
+        <span class="sk sk-line w-25"></span>
+        <span class="sk sk-field"></span>
+        <div class="sk-toolbar"><span class="sk sk-pill"></span><span class="sk sk-pill"></span><span class="sk sk-pill"></span><span class="sk sk-pill"></span></div>
+    </div>
+    <span class="sk sk-button wide"></span>
+</div>
+
+<!--/* Patients in the booking form's dropdown, before the first ones arrive. */-->
+<div th:fragment="picker" class="combo-skeleton" aria-hidden="true">
+    <div class="combo-skeleton-row" th:each="i : ${#numbers.sequence(1, 4)}">
+        <span class="sk sk-circle sk-avatar"></span>
+        <span class="sk-lines"><span class="sk sk-line w-50"></span><span class="sk sk-line w-35"></span></span>
+    </div>
+</div>
+
+</body>
+</html>

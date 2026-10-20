@@ -33,10 +33,14 @@ import app.clinicreminders.whatsapp.MessageLog;
 import app.clinicreminders.whatsapp.MessageLogRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /** Every query added for the dashboard, each with its clinic-isolation case. */
 class DashboardQueriesIT extends IntegrationTest {
+
+    private static final Pageable PAGE = PageRequest.of(0, 50);
 
     private static final Instant TUESDAY = Instant.parse("2026-11-03T08:30:00Z");
 
@@ -124,9 +128,24 @@ class DashboardQueriesIT extends IntegrationTest {
     void patientSearchStaysInItsClinic() {
         data.patient(clinicB, "Rana Elsewhere", "+96170123499", Language.AR);
 
-        assertThat(patients.search(clinicA.getId(), "rana", "")).extracting(Patient::getName).containsExactly("Rana");
-        assertThat(patients.search(clinicA.getId(), "", "70123")).extracting(Patient::getName).containsExactly("Rana");
-        assertThat(patients.search(clinicB.getId(), "rana", "")).extracting(Patient::getName).containsExactly("Rana Elsewhere");
+        assertThat(patients.search(clinicA.getId(), "rana", "", PAGE)).extracting(Patient::getName).containsExactly("Rana");
+        assertThat(patients.search(clinicA.getId(), "", "70123", PAGE)).extracting(Patient::getName).containsExactly("Rana");
+        assertThat(patients.search(clinicB.getId(), "rana", "", PAGE)).extracting(Patient::getName).containsExactly("Rana Elsewhere");
+        assertThat(patients.countSearch(clinicA.getId(), "rana", "")).isEqualTo(1);
+        assertThat(patients.countSearch(clinicB.getId(), "rana", "")).isEqualTo(1);
+    }
+
+    @Test
+    void patientSearchComesAPageAtATime() {
+        for (int i = 0; i < 5; i++) {
+            data.patient(clinicA, "Zed " + i, "+9617088800" + i, Language.AR);
+        }
+
+        assertThat(patients.search(clinicA.getId(), "zed", "", PageRequest.of(0, 2))).extracting(Patient::getName)
+                .containsExactly("Zed 0", "Zed 1");
+        assertThat(patients.search(clinicA.getId(), "zed", "", PageRequest.of(2, 2))).extracting(Patient::getName)
+                .containsExactly("Zed 4");
+        assertThat(patients.countSearch(clinicA.getId(), "zed", "")).isEqualTo(5);
     }
 
     @Test
@@ -138,6 +157,8 @@ class DashboardQueriesIT extends IntegrationTest {
 
         assertThat(conversations.findByClinicIdAndNeedsHumanTrueOrderByUpdatedAtDesc(clinicA.getId())).hasSize(1);
         assertThat(conversations.findByClinicIdAndNeedsHumanTrueOrderByUpdatedAtDesc(clinicB.getId())).isEmpty();
+        assertThat(conversations.countByClinicIdAndNeedsHumanTrue(clinicA.getId())).isEqualTo(1);
+        assertThat(conversations.countByClinicIdAndNeedsHumanTrue(clinicB.getId())).isZero();
         assertThat(conversations.findByIdAndClinicId(waiting.getId(), clinicB.getId())).isEmpty();
         assertThat(conversations.deleteByClinicIdAndPatientPhone(clinicA.getId(), "+96170123456")).isEqualTo(1);
         assertThat(jdbc.queryForObject("select count(*) from conversation", Integer.class)).isEqualTo(1);
@@ -151,14 +172,16 @@ class DashboardQueriesIT extends IntegrationTest {
         logs.save(MessageLog.sent(clinicA.getId(), appointment.getId(), MessageKind.TEMPLATE, "appointment_reminder",
                 "wamid.ok", "utility", null));
 
-        List<FailedSend> failed = logs.findFailedSince(clinicA.getId(), Instant.parse("2026-01-01T00:00:00Z"));
+        List<FailedSend> failed = logs.findFailedSince(clinicA.getId(), Instant.parse("2026-01-01T00:00:00Z"), PAGE);
 
         assertThat(failed).singleElement().satisfies(f -> {
             assertThat(f.patientName()).isEqualTo("Rana");
             assertThat(f.appointmentStartsAt()).isEqualTo(TUESDAY);
             assertThat(f.errorCode()).isEqualTo(131026);
         });
-        assertThat(logs.findFailedSince(clinicB.getId(), Instant.parse("2026-01-01T00:00:00Z"))).isEmpty();
+        assertThat(logs.findFailedSince(clinicB.getId(), Instant.parse("2026-01-01T00:00:00Z"), PAGE)).isEmpty();
+        assertThat(logs.countFailedSince(clinicA.getId(), Instant.parse("2026-01-01T00:00:00Z"))).isEqualTo(1);
+        assertThat(logs.countFailedSince(clinicB.getId(), Instant.parse("2026-01-01T00:00:00Z"))).isZero();
     }
 
     @Test

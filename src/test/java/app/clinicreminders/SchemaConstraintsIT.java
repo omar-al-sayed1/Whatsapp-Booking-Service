@@ -160,14 +160,16 @@ class SchemaConstraintsIT extends IntegrationTest {
         assertThatCode(() -> jdbc.update(insert, clinic, "+9613123456")).doesNotThrowAnyException();
     }
 
+    /** A family shares a number, each under their own name (V8). */
     @Test
-    void thePhoneIsUniquePerClinicButNotAcrossClinics() {
+    void aNumberHasEachNameOncePerClinic() {
         long clinicA = clinic();
-        String insert = "insert into patient (clinic_id, name, phone_e164, language) values (?, 'P', '+96171123456', 'ar')";
-        jdbc.update(insert, clinicA);
+        String insert = "insert into patient (clinic_id, name, phone_e164, language) values (?, ?, '+96171123456', 'ar')";
+        jdbc.update(insert, clinicA, "Rana");
 
-        assertThatThrownBy(() -> jdbc.update(insert, clinicA)).isInstanceOf(DuplicateKeyException.class);
-        assertThatCode(() -> jdbc.update(insert, clinic())).doesNotThrowAnyException();
+        assertThatCode(() -> jdbc.update(insert, clinicA, "Karim")).as("a family member").doesNotThrowAnyException();
+        assertThatThrownBy(() -> jdbc.update(insert, clinicA, "RANA")).isInstanceOf(DuplicateKeyException.class);
+        assertThatCode(() -> jdbc.update(insert, clinic(), "Rana")).doesNotThrowAnyException();
     }
 
     @Test
@@ -192,16 +194,13 @@ class SchemaConstraintsIT extends IntegrationTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    /** The number's WhatsApp user id: a family on one number shares it (V8). */
     @Test
-    void aWhatsAppUserIdBelongsToOnePatientPerClinic() {
+    void patientsMayShareAWhatsAppUserId() {
         long clinicA = clinic();
-        long patient = patient(clinicA);
-        long other = patient(clinicA);
-        jdbc.update("update patient set wa_user_id = 'LB.1' where id = ?", patient);
+        jdbc.update("update patient set wa_user_id = 'LB.1' where id = ?", patient(clinicA));
 
-        assertThatThrownBy(() -> jdbc.update("update patient set wa_user_id = 'LB.1' where id = ?", other))
-                .isInstanceOf(DuplicateKeyException.class);
-        assertThatCode(() -> jdbc.update("update patient set wa_user_id = 'LB.1' where id = ?", patient(clinic())))
+        assertThatCode(() -> jdbc.update("update patient set wa_user_id = 'LB.1' where id = ?", patient(clinicA)))
                 .doesNotThrowAnyException();
     }
 
