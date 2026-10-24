@@ -15,6 +15,7 @@ import org.springframework.web.client.RestClient;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "whatsapp.client=fake",
+        "app.base-url=https://reminders.test",
         "whatsapp.app-secret=test-app-secret",
         "whatsapp.verify-token=test-verify-token",
         "whatsapp.token-encryption-key=AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",

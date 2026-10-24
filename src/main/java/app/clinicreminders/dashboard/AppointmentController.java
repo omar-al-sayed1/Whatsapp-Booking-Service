@@ -5,6 +5,7 @@ import app.clinicreminders.appointment.AppointmentEvents.CancelledBy;
 import app.clinicreminders.appointment.AppointmentRepository;
 import app.clinicreminders.appointment.AppointmentStatus;
 import app.clinicreminders.common.NotFoundException;
+import app.clinicreminders.common.AppProperties;
 import app.clinicreminders.dashboard.ClinicContext.Ctx;
 import app.clinicreminders.patient.Patient;
 import app.clinicreminders.patient.PatientRepository;
@@ -37,13 +38,15 @@ class AppointmentController {
     private final AppointmentRepository appointments;
     private final PatientRepository patients;
     private final DoctorRepository doctors;
+    private final AppProperties app;
 
     AppointmentController(ClinicContext context, AppointmentRepository appointments, PatientRepository patients,
-                          DoctorRepository doctors) {
+                          DoctorRepository doctors, AppProperties app) {
         this.context = context;
         this.appointments = appointments;
         this.patients = patients;
         this.doctors = doctors;
+        this.app = app;
     }
 
     @GetMapping("/appointments/{id}")
@@ -69,6 +72,8 @@ class AppointmentController {
                 appointment.getStatus() == AppointmentStatus.CANCELLED && appointment.getCancelledBy() == CancelledBy.PATIENT,
                 appointment.getSource().name(),
                 WeekController.isMovable(appointment, ctx.now())));
+        // For a patient booked by phone: the "Add to my calendar" page, to send them.
+        model.addAttribute("calendarLink", app.link("/c/" + appointment.getCalendarToken()));
         model.addAttribute("returnTo", "week".equals(returnTo) ? "week" : "");
         model.addAttribute("date", ctx.dateOf(appointment.getStartsAt()));
         model.addAttribute("doctorId", appointment.getDoctorId());

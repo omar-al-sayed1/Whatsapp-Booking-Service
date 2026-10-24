@@ -89,5 +89,25 @@ class MessageCostEstimatorTest {
             rates.add(rate);
             return rate;
         }
+
+        @Override
+        public List<MessageRate> findAllByOrderByMarketAscPricingCategoryAscValidFromDesc() {
+            return List.copyOf(rates);
+        }
+
+        @Override
+        public Optional<MessageRate> findById(Long id) {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean existsByMarketAndPricingCategoryAndValidFrom(String market, String pricingCategory, LocalDate validFrom) {
+            return false;
+        }
+
+        @Override
+        public void delete(MessageRate rate) {
+            rates.remove(rate);
+        }
     }
 }

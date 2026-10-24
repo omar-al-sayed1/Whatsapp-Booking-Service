@@ -1,6 +1,7 @@
 package app.clinicreminders.appointment;
 
 import java.time.Instant;
+import java.util.UUID;
 
 import app.clinicreminders.appointment.AppointmentEvents.CancelledBy;
 import jakarta.persistence.Column;
@@ -52,9 +53,18 @@ public class Appointment {
     @Column(name = "cancelled_by")
     private CancelledBy cancelledBy;
 
+    /** When the patient confirmed; kept as the status moves on (arrived, no-show), for the monthly report. */
+    @Column(name = "confirmed_at")
+    private Instant confirmedAt;
+
     @Generated
     @Column(name = "created_at")
     private Instant createdAt;
+
+    /** The key of the appointment's public "Add to my calendar" page; random, set by the database. */
+    @Generated
+    @Column(name = "calendar_token", insertable = false, updatable = false)
+    private UUID calendarToken;
 
     /** Optimistic lock: concurrent edits (a patient's tap, a secretary's change) can't overwrite each other. */
     @Version
@@ -105,7 +115,7 @@ public class Appointment {
     }
 
     /** @return false if it was already confirmed */
-    public boolean confirm() {
+    public boolean confirm(Instant now) {
         if (status == AppointmentStatus.CONFIRMED) {
             return false;
         }
@@ -113,6 +123,7 @@ public class Appointment {
             throw new IllegalStateException("Only a booked appointment can be confirmed, not " + status);
         }
         this.status = AppointmentStatus.CONFIRMED;
+        this.confirmedAt = now;
         return true;
     }
 
@@ -125,6 +136,7 @@ public class Appointment {
         this.startsAt = startsAt;
         this.endsAt = endsAt;
         this.status = AppointmentStatus.BOOKED;
+        this.confirmedAt = null;
     }
 
     private void requireActive() {
@@ -173,7 +185,15 @@ public class Appointment {
         return cancelledBy;
     }
 
+    public Instant getConfirmedAt() {
+        return confirmedAt;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public UUID getCalendarToken() {
+        return calendarToken;
     }
 }

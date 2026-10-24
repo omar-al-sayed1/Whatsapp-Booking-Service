@@ -89,7 +89,7 @@ public class AppointmentService {
 
     /** @return false if it was already confirmed */
     public boolean confirm(long clinicId, long appointmentId) {
-        return find(clinicId, appointmentId).confirm();
+        return find(clinicId, appointmentId).confirm(clock.instant());
     }
 
     public void cancel(long clinicId, long appointmentId, CancelledBy by) {

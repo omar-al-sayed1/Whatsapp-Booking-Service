@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'operator-rates', ~{::main})}">
+<head><title th:text="#{rates.title}">Message rates</title></head>
+<body>
+<!--/*
+  The rate card the cost estimates come from, typed in from Meta's published rates (never guessed).
+  A rate applies from its date on; estimates already recorded stay as they are.
+*/-->
+<main class="container narrow">
+    <header class="page-head">
+        <div>
+            <div class="eyebrow"><svg class="icon" aria-hidden="true"><use href="#i-message"/></svg><span th:text="#{operator.title}">Operator</span></div>
+            <h1 th:text="#{rates.title}">Message rates</h1>
+        </div>
+    </header>
+    <p class="muted" th:text="#{rates.lead}">Copy the per-message prices from Meta's rate card. Every message gets the estimate in force on its day.</p>
+
+    <section class="card">
+        <div class="section-head"><h2 th:text="#{rates.current}">Rates</h2></div>
+        <p class="muted" th:if="${rates.isEmpty()}" th:text="#{rates.none}">No rates yet: messages have no cost estimate.</p>
+        <div class="table-scroll" th:unless="${rates.isEmpty()}">
+            <table class="data-table">
+                <thead><tr>
+                    <th scope="col" th:text="#{rates.market}">Market</th>
+                    <th scope="col" th:text="#{rates.category}">Category</th>
+                    <th scope="col" class="num" th:text="#{rates.usd}">USD per message</th>
+                    <th scope="col" th:text="#{rates.valid-from}">From</th>
+                    <th scope="col"><span class="sr-only" th:text="#{action.delete}">Delete</span></th>
+                </tr></thead>
+                <tbody>
+                    <tr th:each="r : ${rates}">
+                        <td th:attr="data-label=#{rates.market}" th:text="${r.market}">Rest of Middle East</td>
+                        <td th:attr="data-label=#{rates.category}" th:text="${r.pricingCategory}">utility</td>
+                        <td class="num" th:attr="data-label=#{rates.usd}" th:text="${r.usdPerMessage.stripTrailingZeros().toPlainString()}">0.0157</td>
+                        <td th:attr="data-label=#{rates.valid-from}" th:text="${r.validFrom}">2026-10-01</td>
+                        <td>
+                            <form method="post" th:action="@{/operator/rates/{id}/delete(id=${r.id})}" th:data-confirm="#{rates.delete-confirm}">
+                                <button type="submit" class="sm danger icon-btn" th:title="#{action.delete}" th:aria-label="#{action.delete}">
+                                    <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button>
+                            </form>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <form method="post" th:action="@{/operator/rates}" class="inline-form">
+            <label><span th:text="#{rates.market}">Market</span>
+                <select name="market" required>
+                    <option th:each="m : ${markets}" th:value="${m}" th:text="${m}">Rest of Middle East</option>
+                </select></label>
+            <label><span th:text="#{rates.category}">Category</span>
+                <input type="text" name="category" list="rate-categories" required autocomplete="off" dir="ltr" placeholder="utility">
+                <datalist id="rate-categories"><option th:each="c : ${categories}" th:value="${c}">utility</option></datalist></label>
+            <label><span th:text="#{rates.usd}">USD per message</span>
+                <input type="number" name="usdPerMessage" min="0" max="0.999999" step="0.000001" required dir="ltr" placeholder="0.0000"></label>
+            <label><span th:text="#{rates.valid-from}">From</span>
+                <input type="date" name="validFrom" th:value="${today}" required></label>
+            <button type="submit" class="primary"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+                <span th:text="#{rates.add}">Add rate</span></button>
+        </form>
+        <p class="hint" th:text="#{rates.hint}">Meta prices by the recipient's country and the message's category.</p>
+    </section>
+</main>
+</body>
+</html>

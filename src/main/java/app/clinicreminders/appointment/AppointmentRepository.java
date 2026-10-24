@@ -4,6 +4,9 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
+
+import app.clinicreminders.common.CrossTenant;
 
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
@@ -12,6 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 public interface AppointmentRepository extends Repository<Appointment, Long> {
 
     Optional<Appointment> findByIdAndClinicId(Long id, Long clinicId);
+
+    @CrossTenant("Public calendar page: the unguessable token is the key, and the page shows one appointment's "
+            + "time, doctor and clinic, never the patient")
+    Optional<Appointment> findByCalendarToken(UUID calendarToken);
 
     /** Active (not cancelled) appointments of one doctor that overlap {@code [from, to)}. */
     @Query("""

@@ -117,7 +117,7 @@ class AppointmentRepositoryIT extends IntegrationTest {
         appointments.save(arrived);
         Appointment later = data.appointment(doctor, patient, now.plus(Duration.ofDays(2)), HALF_HOUR);
         Appointment next = data.appointment(doctor, patient, now.plus(Duration.ofDays(1)), HALF_HOUR);
-        next.confirm();
+        next.confirm(clock.instant());
         appointments.save(next);
 
         assertThat(appointments.findNextOpen(clinic.getId(), patient.getId(), now)).get()

@@ -6,11 +6,15 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 
 import app.clinicreminders.appointment.Appointment;
 import app.clinicreminders.appointment.AppointmentEvents.CancelledBy;
@@ -23,6 +27,8 @@ import app.clinicreminders.booking.ConversationState;
 import app.clinicreminders.common.Language;
 import app.clinicreminders.patient.Patient;
 import app.clinicreminders.patient.PatientRepository;
+import app.clinicreminders.reminder.ReminderKind;
+import app.clinicreminders.reminder.ReminderMessages;
 import app.clinicreminders.scheduling.Doctor;
 import app.clinicreminders.scheduling.DoctorRepository;
 import app.clinicreminders.scheduling.ScheduleRule;
@@ -34,6 +40,7 @@ import app.clinicreminders.staff.StaffAccounts;
 import app.clinicreminders.staff.StaffAccounts.NewPassword;
 import app.clinicreminders.staff.StaffRole;
 import app.clinicreminders.staff.StaffUser;
+import app.clinicreminders.whatsapp.MessageCostEstimator;
 import app.clinicreminders.whatsapp.MessageKind;
 import app.clinicreminders.whatsapp.MessageLog;
 import app.clinicreminders.whatsapp.MessageLogRepository;
@@ -44,7 +51,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The "Dr. Demo" clinic for sales demos (SPEC section 5.5): two doctors, a dozen patients and four
  * weeks of appointments around today, with planned reminders, a conversation waiting for the
- * secretary and a failed send, so every dashboard page has something to show.
+ * secretary and a failed send, so every dashboard page has something to show. Past appointments
+ * come with the reminders sent for them and most patients' confirmations, for the monthly report.
  *
  * <p>The clinic is found by its fake WhatsApp phone number id, never by name, so a real clinic is
  * never touched. Running it again replaces only the demo clinic's doctors, patients, appointments,
@@ -96,6 +104,7 @@ public class DemoClinic {
     private final SlotService slots;
     private final ConversationRepository conversations;
     private final MessageLogRepository logs;
+    private final MessageCostEstimator costs;
     private final StaffAccounts accounts;
     private final JdbcTemplate jdbc;
     private final Clock clock;
@@ -103,7 +112,7 @@ public class DemoClinic {
     DemoClinic(ClinicRepository clinics, DoctorRepository doctors, ScheduleRuleRepository rules,
                PatientRepository patients, AppointmentRepository appointments, AppointmentService appointmentService,
                SlotService slots, ConversationRepository conversations, MessageLogRepository logs,
-               StaffAccounts accounts, JdbcTemplate jdbc, Clock clock) {
+               MessageCostEstimator costs, StaffAccounts accounts, JdbcTemplate jdbc, Clock clock) {
         this.clinics = clinics;
         this.doctors = doctors;
         this.rules = rules;
@@ -113,6 +122,7 @@ public class DemoClinic {
         this.slots = slots;
         this.conversations = conversations;
         this.logs = logs;
+        this.costs = costs;
         this.accounts = accounts;
         this.jdbc = jdbc;
         this.clock = clock;
@@ -194,7 +204,7 @@ public class DemoClinic {
                         slot.start(), source);
                 boolean soon = slot.start().isBefore(now.plus(Duration.ofDays(1)));
                 if (random.nextDouble() < (soon ? 0.7 : 0.2)) {
-                    appointment.confirm();
+                    appointment.confirm(now.minus(Duration.ofHours(1 + random.nextInt(20))));
                 }
                 made.add(appointment);
                 continue;
@@ -202,17 +212,57 @@ public class DemoClinic {
             // Statuses set directly: no reminders, and no cancellation messages to made-up numbers.
             Appointment appointment = new Appointment(clinic.getId(), doctor.getId(), patient.getId(), slot.start(),
                     slot.end(), source);
+            boolean confirmed = random.nextDouble() < (roll < 0.22 ? 0.3 : 0.75);
             if (roll < 0.1) {
                 Instant cancelledAt = slot.start().minus(Duration.ofHours(3 + random.nextInt(40)));
                 appointment.cancel(cancelledAt.isBefore(now) ? cancelledAt : now, CancelledBy.PATIENT);
-            } else if (roll < 0.22) {
-                appointment.markNoShow(slot.start());
             } else {
-                appointment.markArrived();
+                if (confirmed) {
+                    appointment.confirm(slot.start().minus(Duration.ofHours(20)));
+                }
+                if (roll < 0.22) {
+                    appointment.markNoShow(slot.start());
+                } else {
+                    appointment.markArrived();
+                }
             }
-            made.add(appointments.save(appointment));
+            Appointment saved = appointments.save(appointment);
+            remindersSent(clinic.getId(), saved, patient);
+            made.add(saved);
         }
         return made;
+    }
+
+    /**
+     * The reminders a past appointment had: the day before and 2 hours before, unless the patient had
+     * cancelled by then; each with its message, priced if the operator has set Meta's rates.
+     */
+    private void remindersSent(long clinicId, Appointment appointment, Patient patient) {
+        Instant start = appointment.getStartsAt();
+        for (var reminder : List.of(
+                Map.entry(ReminderKind.H24, Map.entry(ReminderMessages.H24_TEMPLATE, start.minus(Duration.ofHours(24)))),
+                Map.entry(ReminderKind.H2, Map.entry(ReminderMessages.H2_TEMPLATE, start.minus(Duration.ofHours(2)))))) {
+            Instant sentAt = reminder.getValue().getValue();
+            if (appointment.getCancelledAt() != null && !appointment.getCancelledAt().isAfter(sentAt)) {
+                continue;
+            }
+            String messageId = "wamid.DEMO-" + UUID.randomUUID();
+            jdbc.update("""
+                    insert into reminder (clinic_id, appointment_id, kind, due_at, status, attempts, sent_message_id, sent_at)
+                    values (?, ?, ?, ?, 'SENT', 1, ?, ?)""", clinicId, appointment.getId(), reminder.getKey().name(),
+                    utc(sentAt), messageId, utc(sentAt));
+            jdbc.update("""
+                    insert into message_log (clinic_id, appointment_id, direction, wa_message_id, kind, template_name,
+                                             pricing_category, status, est_cost_usd, created_at)
+                    values (?, ?, 'OUT', ?, 'TEMPLATE', ?, 'utility', 'READ', ?, ?)""", clinicId, appointment.getId(),
+                    messageId, reminder.getValue().getKey(),
+                    costs.estimate(patient.getPhoneE164(), "utility", LocalDate.ofInstant(sentAt, Clinic.DEFAULT_ZONE)),
+                    utc(sentAt));
+        }
+    }
+
+    private static OffsetDateTime utc(Instant instant) {
+        return instant.atOffset(ZoneOffset.UTC);
     }
 
     private NewPassword login(long clinicId) {

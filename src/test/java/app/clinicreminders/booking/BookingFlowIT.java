@@ -182,7 +182,8 @@ class BookingFlowIT extends IntegrationTest {
 
         SentMessage done = lastSentTo(PHONE);
         assertThat(done.message()).isEqualTo(new TextMessage(PHONE,
-                "تم الحجز باسم Rana: د. خوري يوم الخميس 15 تشرين الأول الساعة 10:30 ص. للإلغاء، راسلنا واختر «موعدي»."));
+                "تم الحجز باسم Rana: د. خوري يوم الخميس 15 تشرين الأول الساعة 10:30 ص. للإلغاء، راسلنا واختر «موعدي»."
+                        + "\nأضِف الموعد إلى تقويمك: https://reminders.test/c/" + booked.getCalendarToken()));
         assertThat(logs.findByClinicIdAndWaMessageId(clinic.getId(), done.waMessageId()).orElseThrow().getAppointmentId())
                 .isEqualTo(booked.getId());
         assertThat(whatsApp.recent()).as("menu, days, times, confirmation, booked").hasSize(5);

@@ -502,7 +502,8 @@ class BookingFlow {
                 return times(sameDay, true);
             }
             return new Step(ConversationState.DONE, context.cleared(),
-                    messages.booked(phone, language, patient.getName(), doctorName(doctorId), time, zone),
+                    messages.booked(phone, language, patient.getName(), doctorName(doctorId), time, zone,
+                            booked.get().getCalendarToken()),
                     booked.get().getId(), false);
         }
 

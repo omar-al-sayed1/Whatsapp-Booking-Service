@@ -46,6 +46,9 @@
                 <svg class="icon" aria-hidden="true"><use href="#i-week"/></svg><span th:text="#{nav.week}">Week</span></a>
             <a th:href="@{/patients}" th:classappend="${active == 'patients'} ? 'active'" th:attr="aria-current=${active == 'patients'} ? 'page'">
                 <svg class="icon" aria-hidden="true"><use href="#i-users"/></svg><span th:text="#{nav.patients}">Patients</span></a>
+            <!--/* Phones: in the account menu instead, so the bottom bar keeps five items at most. */-->
+            <a class="nav-report" th:href="@{/report}" th:classappend="${active == 'report'} ? 'active'" th:attr="aria-current=${active == 'report'} ? 'page'">
+                <svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg><span th:text="#{nav.report}">Report</span></a>
             <!--/* A doctor's login: their own hours instead of the doctors, the clinic's settings and the inbox. */-->
             <a th:if="${staff.doctorId() != null}" th:href="@{/doctors/{id}(id=${staff.doctorId()})}"
                th:classappend="${active == 'doctors'} ? 'active'" th:attr="aria-current=${active == 'doctors'} ? 'page'">
@@ -64,6 +67,12 @@
             <a th:href="@{/operator/patients}" th:classappend="${active == 'operator-patients'} ? 'active'"
                th:attr="aria-current=${active == 'operator-patients'} ? 'page'">
                 <svg class="icon" aria-hidden="true"><use href="#i-users"/></svg><span th:text="#{operator.patients.title}">Patients</span></a>
+            <a th:href="@{/operator/report}" th:classappend="${active == 'operator-report'} ? 'active'"
+               th:attr="aria-current=${active == 'operator-report'} ? 'page'">
+                <svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg><span th:text="#{nav.report}">Report</span></a>
+            <a th:href="@{/operator/rates}" th:classappend="${active == 'operator-rates'} ? 'active'"
+               th:attr="aria-current=${active == 'operator-rates'} ? 'page'">
+                <svg class="icon" aria-hidden="true"><use href="#i-message"/></svg><span th:text="#{nav.rates}">Message rates</span></a>
         </nav>
 
         <!--/* The account menu, and beside it (clinic staff) the bell for Needs attention with its count. */-->
@@ -82,12 +91,15 @@
                         <svg class="icon" aria-hidden="true"><use href="#i-chevron-up"/></svg>
                     </summary>
                     <div class="menu-panel">
-                        <!--/* Phones only (CSS): the bell beside the menu takes its place on computers. */-->
-                        <th:block th:if="${staff.clinicId() != null and staff.doctorId() == null}">
-                            <a class="menu-attention" th:href="@{/attention}" th:classappend="${active == 'attention'} ? 'active'"
-                               th:attr="aria-current=${active == 'attention'} ? 'page'">
+                        <!--/* Phones only (CSS): on computers the bell beside the menu and the sidebar have these. */-->
+                        <th:block th:if="${staff.clinicId() != null}">
+                            <a class="menu-attention" th:if="${staff.doctorId() == null}" th:href="@{/attention}"
+                               th:classappend="${active == 'attention'} ? 'active'" th:attr="aria-current=${active == 'attention'} ? 'page'">
                                 <svg class="icon" aria-hidden="true"><use href="#i-bell"/></svg><span th:text="#{nav.attention}">Needs attention</span>
                                 <span class="nav-badge" th:if="${attentionCount != null and attentionCount > 0}" th:text="${attentionCount}">2</span></a>
+                            <a class="menu-report" th:href="@{/report}" th:classappend="${active == 'report'} ? 'active'"
+                               th:attr="aria-current=${active == 'report'} ? 'page'">
+                                <svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg><span th:text="#{nav.report}">Report</span></a>
                             <hr class="menu-attention-rule">
                         </th:block>
                         <div class="menu-title" th:text="#{theme.title}">Theme</div>

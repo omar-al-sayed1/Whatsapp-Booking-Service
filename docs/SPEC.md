@@ -94,6 +94,26 @@ Per clinic per month: appointments, reminders sent, confirmations, cancellations
 ahead ("slots saved"), no-shows and estimated message cost. Shown in the dashboard with a CSV
 export. A WhatsApp summary to the doctor comes after the MVP.
 
+As built (M6), every appointment figure is about the appointments starting in the month, in the
+clinic's zone; messages are the ones sent in it:
+
+- Slots saved: cancelled by the patient on WhatsApp at least 2 hours ahead, and how many of those
+  slots someone else booked again. Late cancellations, cancellations by the clinic, appointments
+  still to come and past ones nobody marked are counted apart.
+- Confirmations use `appointment.confirmed_at` (V9), as the status moves on to arrived or no-show.
+- The no-show rate is no-shows out of arrived plus no-shows.
+- Busy hours: per weekday and hour, appointments booked against the slots the doctors' current
+  weekly hours (with the month's days off) offered.
+- Messages by pricing category with their estimates; the operator enters Meta's rates on
+  /operator/rates (never guessed), and sees every clinic's month on /operator/report.
+- A doctor's own login sees only their appointments, without the clinic's messages.
+- The CSV has a byte order mark so Excel shows Arabic, and neutralises cells that start like a formula.
+
+Patients also get an "Add to my calendar" link (V10 `appointment.calendar_token`, random) in the
+WhatsApp booking confirmation: a public page with the clinic, doctor and time (never the patient)
+and an iCalendar file. The secretary can copy it from an appointment to send to a patient booked by
+phone.
+
 ### 5.5 Operator onboarding
 
 A super-admin page to create a clinic, set its timezone and language, store its WhatsApp phone

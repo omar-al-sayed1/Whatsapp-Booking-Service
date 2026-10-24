@@ -36,6 +36,14 @@
                     <dd><span class="source" th:classappend="${details.source() == 'WHATSAPP'} ? 'whatsapp'">
                         <svg class="icon" aria-hidden="true"><use th:href="${details.source() == 'WHATSAPP'} ? '#i-chat' : '#i-pencil'"/></svg>
                         <span th:text="#{'source.' + ${details.source()}}">WhatsApp</span></span></dd></div>
+                <div th:if="${details.movable()}"><dt th:text="#{appointment.calendar-link}">Calendar link</dt>
+                    <dd class="copy-link">
+                        <a th:href="${calendarLink}" target="_blank" rel="noopener" dir="ltr" th:text="${calendarLink}">https://…/c/…</a>
+                        <button type="button" class="sm" th:attr="data-copy=${calendarLink},data-copied=#{appointment.calendar-link.copied}">
+                            <svg class="icon" aria-hidden="true"><use href="#i-calendar-plus"/></svg>
+                            <span th:text="#{appointment.calendar-link.copy}">Copy to send</span></button>
+                        <span class="hint" th:text="#{appointment.calendar-link.hint}">The patient adds the appointment to their phone's calendar.</span>
+                    </dd></div>
             </dl>
         </section>
 

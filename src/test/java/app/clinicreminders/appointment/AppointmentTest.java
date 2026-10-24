@@ -17,20 +17,32 @@ class AppointmentTest {
     void confirmingTwiceIsANoOp() {
         Appointment appointment = booked();
 
-        assertThat(appointment.confirm()).isTrue();
-        assertThat(appointment.confirm()).isFalse();
+        assertThat(appointment.confirm(NOW)).isTrue();
+        assertThat(appointment.confirm(NOW.plusSeconds(60))).isFalse();
         assertThat(appointment.getStatus()).isEqualTo(AppointmentStatus.CONFIRMED);
+        assertThat(appointment.getConfirmedAt()).isEqualTo(NOW);
     }
 
     @Test
     void movingAConfirmedAppointmentNeedsConfirmingAgain() {
         Appointment appointment = booked();
-        appointment.confirm();
+        appointment.confirm(NOW);
 
         appointment.reschedule(START.plusSeconds(86_400), START.plusSeconds(86_400 + 1800));
 
         assertThat(appointment.getStatus()).isEqualTo(AppointmentStatus.BOOKED);
+        assertThat(appointment.getConfirmedAt()).isNull();
         assertThat(appointment.getStartsAt()).isEqualTo(START.plusSeconds(86_400));
+    }
+
+    @Test
+    void arrivingKeepsWhenThePatientConfirmed() {
+        Appointment appointment = booked();
+        appointment.confirm(NOW);
+
+        appointment.markArrived();
+
+        assertThat(appointment.getConfirmedAt()).isEqualTo(NOW);
     }
 
     @Test
@@ -49,7 +61,7 @@ class AppointmentTest {
         Appointment appointment = booked();
         appointment.cancel(NOW, CancelledBy.STAFF);
 
-        assertThatIllegalStateException().isThrownBy(appointment::confirm);
+        assertThatIllegalStateException().isThrownBy(() -> appointment.confirm(NOW));
         assertThatIllegalStateException().isThrownBy(() -> appointment.reschedule(START, START.plusSeconds(60)));
         assertThatIllegalStateException().isThrownBy(() -> appointment.cancel(NOW, CancelledBy.STAFF));
         assertThatIllegalStateException().isThrownBy(appointment::markArrived);

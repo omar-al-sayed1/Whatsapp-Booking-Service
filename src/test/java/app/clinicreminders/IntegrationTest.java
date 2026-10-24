@@ -19,6 +19,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 @SpringBootTest(properties = {
         "whatsapp.client=fake",
+        "app.base-url=https://reminders.test",
         "whatsapp.app-secret=test-app-secret",
         "whatsapp.verify-token=test-verify-token",
         "whatsapp.token-encryption-key=AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",

@@ -2,14 +2,17 @@ package app.clinicreminders.booking;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.net.URI;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import app.clinicreminders.booking.BookingMessages.Upcoming;
+import app.clinicreminders.common.AppProperties;
 import app.clinicreminders.common.Language;
 import app.clinicreminders.patient.Patient;
 import app.clinicreminders.scheduling.Doctor;
@@ -29,7 +32,8 @@ class BookingMessagesTest {
     /** Tuesday 3 November 2026, 10:30 in Beirut. */
     private static final Instant TUE_1030 = Instant.parse("2026-11-03T08:30:00Z");
 
-    private final BookingMessages messages = new BookingMessages(messageSource());
+    private final BookingMessages messages = new BookingMessages(messageSource(),
+            new AppProperties(URI.create("https://reminders.example.com/")));
 
     @Test
     void theMenuInBothLanguages() {
@@ -138,8 +142,10 @@ class BookingMessagesTest {
 
     @Test
     void bookedNamesThePatient() {
-        assertThat(messages.booked(TO, Language.EN, "Karim", "Dr. Khoury", TUE_1030, BEIRUT).body())
-                .isEqualTo("Booked for Karim: Dr. Khoury on Tuesday 3 November at 10:30 AM. To cancel, message us and tap My appointment.");
+        UUID token = UUID.fromString("6f1c2a0e-1d2b-4c3d-9e8f-0a1b2c3d4e5f");
+        assertThat(messages.booked(TO, Language.EN, "Karim", "Dr. Khoury", TUE_1030, BEIRUT, token).body())
+                .isEqualTo("Booked for Karim: Dr. Khoury on Tuesday 3 November at 10:30 AM. To cancel, message us and tap My appointment."
+                        + "\nAdd it to your calendar: https://reminders.example.com/c/" + token);
         assertThat(messages.askName(TO, Language.EN).body()).isEqualTo("What is the patient's full name? Please type it.");
     }
 

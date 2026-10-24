@@ -679,6 +679,27 @@
         form.querySelector("[name=name]").dispatchEvent(new Event("input", {bubbles: true}));
     });
 
+    // "Copy" buttons (the calendar link on an appointment): to the clipboard, and say so for a moment.
+    document.addEventListener("click", async event => {
+        const button = event.target.closest("[data-copy]");
+        if (!button) {
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(button.dataset.copy);
+        } catch (e) {
+            return; // no clipboard (an insecure page): the link is still there to select
+        }
+        const label = button.querySelector("span");
+        const before = label.textContent;
+        label.textContent = button.dataset.copied;
+        button.classList.add("copied");
+        setTimeout(() => {
+            label.textContent = before;
+            button.classList.remove("copied");
+        }, 2000);
+    });
+
     // Keeps the focus in the search box while an option is clicked (some browsers would move it away).
     document.addEventListener("mousedown", event => {
         if (event.target.closest(".combo-results")) {

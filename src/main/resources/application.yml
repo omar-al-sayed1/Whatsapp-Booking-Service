@@ -30,6 +30,10 @@ spring:
       date: iso
       time: iso
 
+app:
+  # Public address of this service, for links sent to patients (SPEC section 7).
+  base-url: ${APP_BASE_URL}
+
 management:
   endpoints:
     web:

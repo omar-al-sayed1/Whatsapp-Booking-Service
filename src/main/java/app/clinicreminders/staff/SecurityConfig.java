@@ -39,6 +39,8 @@ class SecurityConfig {
                         .requestMatchers("/login", "/css/**", "/js/**", "/fonts/**", "/webjars/**", "/favicon.ico", "/error").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/webhooks/whatsapp").permitAll()
+                        // A patient's "Add to my calendar" page: the random token in the link is the key.
+                        .requestMatchers(HttpMethod.GET, "/c/*", "/c/*/calendar.ics").permitAll()
                         .requestMatchers("/dev/whatsapp", "/dev/whatsapp/**").permitAll()
                         .requestMatchers("/operator", "/operator/**").hasRole(StaffRole.OPERATOR.name())
                         .requestMatchers("/", "/language", "/account/**").authenticated()

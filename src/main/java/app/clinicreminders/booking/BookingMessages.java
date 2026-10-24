@@ -8,7 +8,9 @@ import java.time.temporal.TemporalAccessor;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
+import app.clinicreminders.common.AppProperties;
 import app.clinicreminders.common.Language;
 import app.clinicreminders.patient.Patient;
 import app.clinicreminders.scheduling.Doctor;
@@ -42,9 +44,11 @@ class BookingMessages {
     }
 
     private final MessageSource messages;
+    private final AppProperties app;
 
-    BookingMessages(MessageSource messages) {
+    BookingMessages(MessageSource messages, AppProperties app) {
         this.messages = messages;
+        this.app = app;
     }
 
     /** Book / My appointment / Info. */
@@ -127,9 +131,16 @@ class BookingMessages {
         return new TextMessage(to, text("booking.name.ask", language));
     }
 
-    TextMessage booked(String to, Language language, String patient, String doctor, Instant startsAt, ZoneId zone) {
+    /** With the link to the appointment's "Add to my calendar" page. */
+    TextMessage booked(String to, Language language, String patient, String doctor, Instant startsAt, ZoneId zone,
+                       UUID calendarToken) {
         return new TextMessage(to, text("booking.booked", language, patient, doctor, date(startsAt.atZone(zone), language),
-                time(startsAt, zone, language)));
+                time(startsAt, zone, language)) + "\n" + text("booking.booked.calendar", language, calendarLink(calendarToken)));
+    }
+
+    /** The public "Add to my calendar" page of an appointment. */
+    String calendarLink(UUID calendarToken) {
+        return app.link("/c/" + calendarToken);
     }
 
     TextMessage notBooked(String to, Language language) {

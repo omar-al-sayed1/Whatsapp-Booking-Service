@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'operator-report', ~{::main})}">
+<head><title th:text="#{operator.report.title} + ' · ' + ${monthLabel}">Clinics this month · October 2026</title></head>
+<body>
+<!--/* Every clinic's month side by side: what the service saved them and what their messages cost. */-->
+<main class="container report">
+    <header class="page-head report-head">
+        <div>
+            <div class="eyebrow"><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg><span th:text="#{operator.report.title}">Clinics this month</span></div>
+            <h1 th:text="${monthLabel}">October 2026</h1>
+        </div>
+        <div class="report-tools">
+            <nav class="month-nav" th:aria-label="#{report.month}">
+                <a class="button ghost icon-btn" th:if="${previousMonth}" th:href="@{/operator/report(month=${previousMonth})}"
+                   th:title="#{report.month.previous}" th:aria-label="#{report.month.previous}">
+                    <svg class="icon flip-rtl" aria-hidden="true"><use href="#i-chevron-left"/></svg></a>
+                <span class="icon-btn month-gap" th:unless="${previousMonth}" aria-hidden="true"></span>
+                <a class="button ghost sm" th:unless="${current}" th:href="@{/operator/report}" th:text="#{report.month.this}">This month</a>
+                <a class="button ghost icon-btn" th:if="${nextMonth}" th:href="@{/operator/report(month=${nextMonth})}"
+                   th:title="#{report.month.next}" th:aria-label="#{report.month.next}">
+                    <svg class="icon flip-rtl" aria-hidden="true"><use href="#i-chevron-right"/></svg></a>
+                <span class="icon-btn month-gap" th:unless="${nextMonth}" aria-hidden="true"></span>
+            </nav>
+        </div>
+    </header>
+
+    <p class="alert info-alert" role="status" th:if="${noRates}">
+        <svg class="icon" aria-hidden="true"><use href="#i-info"/></svg>
+        <span><span th:text="#{operator.report.no-rates}">No message rates are set, so costs can't be estimated.</span>
+            <a th:href="@{/operator/rates}" th:text="#{operator.report.set-rates}">Set Meta's rates</a></span></p>
+
+    <div class="card empty" th:if="${rows.isEmpty()}">
+        <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-building"/></svg></span>
+        <strong th:text="#{operator.clinics.none}">No clinics yet.</strong>
+    </div>
+
+    <section class="card" th:unless="${rows.isEmpty()}">
+        <div class="table-scroll">
+            <table class="data-table report-table">
+                <thead><tr>
+                    <th scope="col" th:text="#{operator.report.clinic}">Clinic</th>
+                    <th scope="col" class="num" th:text="#{report.col.appointments}">Appointments</th>
+                    <th scope="col" class="num" th:text="#{report.col.on-whatsapp}">On WhatsApp</th>
+                    <th scope="col" class="num" th:text="#{report.col.slots-saved}">Slots saved</th>
+                    <th scope="col" class="num" th:text="#{report.col.no-shows}">No-shows</th>
+                    <th scope="col" class="num" th:text="#{report.col.reminders}">Reminders</th>
+                    <th scope="col" class="num" th:text="#{report.col.sent}">Messages</th>
+                    <th scope="col" class="num" th:text="#{report.col.cost}">Estimated cost</th>
+                </tr></thead>
+                <tbody>
+                    <tr th:each="r : ${rows}" th:with="f=${r.figures()}">
+                        <th scope="row"><a th:href="@{/operator/clinics/{id}/report(id=${r.id()}, month=${monthValue})}" th:text="${r.name()}">Dr. Demo</a></th>
+                        <td class="num" th:attr="data-label=#{report.col.appointments}" th:text="${f.appointments()}">64</td>
+                        <td class="num" th:attr="data-label=#{report.col.on-whatsapp}" th:text="${f.bookedOnWhatsApp()}">22</td>
+                        <td class="num" th:attr="data-label=#{report.col.slots-saved}" th:text="${f.slotsSaved()}">6</td>
+                        <td class="num" th:attr="data-label=#{report.col.no-shows}" th:text="${f.noShows()}">3</td>
+                        <td class="num" th:attr="data-label=#{report.col.reminders}" th:text="${f.remindersSent()}">96</td>
+                        <td class="num" th:attr="data-label=#{report.col.sent}" th:text="${r.messages()}">140</td>
+                        <td class="num" th:attr="data-label=#{report.col.cost}">
+                            <span th:text="${r.cost()}">$4.12</span>
+                            <span class="chip chip-warn" th:if="${r.unpriced() > 0}" th:title="#{report.unpriced(${r.unpriced() + ''})}"
+                                  th:text="#{operator.report.unpriced(${r.unpriced() + ''})}">+12 unpriced</span></td>
+                    </tr>
+                    <tr class="total-row" th:if="${rows.size() > 1}">
+                        <th scope="row" th:text="#{report.total}">Total</th>
+                        <td class="num" th:attr="data-label=#{report.col.appointments}" th:text="${total.appointments()}">64</td>
+                        <td class="num" th:attr="data-label=#{report.col.on-whatsapp}" th:text="${total.bookedOnWhatsApp()}">22</td>
+                        <td class="num" th:attr="data-label=#{report.col.slots-saved}" th:text="${total.slotsSaved()}">6</td>
+                        <td class="num" th:attr="data-label=#{report.col.no-shows}" th:text="${total.noShows()}">3</td>
+                        <td class="num" th:attr="data-label=#{report.col.reminders}" th:text="${total.remindersSent()}">96</td>
+                        <td class="num" th:attr="data-label=#{report.col.sent}" th:text="${totalMessages}">140</td>
+                        <td class="num" th:attr="data-label=#{report.col.cost}" th:text="${totalCost}">$4.12</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="hint" th:text="#{report.cost.note}">Estimates from Meta's rates, before any free messages or discounts.</p>
+    </section>
+</main>
+</body>
+</html>

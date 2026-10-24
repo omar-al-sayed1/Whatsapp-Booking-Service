@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, ${active}, ~{::main})}">
+<head><title th:text="#{report.title} + ' · ' + ${monthLabel}">Report · October 2026</title></head>
+<body>
+<!--/*
+  The monthly report (SPEC section 5.4), for the clinic and, read-only, for the operator. Every figure
+  is about the appointments starting in the month; messages are the ones sent in it. A doctor's login
+  sees only their own appointments and no messages.
+*/-->
+<main class="container report">
+    <a class="back-link" th:if="${operatorView}" th:href="@{/operator/report(month=${monthValue})}">
+        <svg class="icon flip-rtl" aria-hidden="true"><use href="#i-chevron-left"/></svg><span th:text="#{operator.report.title}">Clinics this month</span></a>
+    <header class="page-head report-head">
+        <div>
+            <div class="eyebrow"><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg>
+                <span th:text="${operatorView} ? ${report.clinic()} : #{report.title}">Report</span></div>
+            <h1 th:text="${monthLabel}">October 2026</h1>
+            <p class="muted" th:if="${current}" th:text="#{report.so-far}">So far this month; appointments still to come are counted as booked.</p>
+        </div>
+        <div class="report-tools">
+            <nav class="month-nav" th:aria-label="#{report.month}">
+                <a class="button ghost icon-btn" th:if="${previousMonth}" th:href="@{${reportBase}(month=${previousMonth})}"
+                   th:title="#{report.month.previous}" th:aria-label="#{report.month.previous}">
+                    <svg class="icon flip-rtl" aria-hidden="true"><use href="#i-chevron-left"/></svg></a>
+                <span class="icon-btn month-gap" th:unless="${previousMonth}" aria-hidden="true"></span>
+                <a class="button ghost sm" th:unless="${current}" th:href="@{${reportBase}}" th:text="#{report.month.this}">This month</a>
+                <a class="button ghost icon-btn" th:if="${nextMonth}" th:href="@{${reportBase}(month=${nextMonth})}"
+                   th:title="#{report.month.next}" th:aria-label="#{report.month.next}">
+                    <svg class="icon flip-rtl" aria-hidden="true"><use href="#i-chevron-right"/></svg></a>
+                <span class="icon-btn month-gap" th:unless="${nextMonth}" aria-hidden="true"></span>
+            </nav>
+            <a class="button" th:href="@{${reportBase + '.csv'}(month=${monthValue})}" download>
+                <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><span th:text="#{report.download}">Download CSV</span></a>
+        </div>
+    </header>
+
+    <th:block th:with="t=${report.total()}">
+    <!--/* The figures that show what the service does for the clinic. */-->
+    <div class="stats report-stats">
+        <div class="stat tone-ok">
+            <div class="stat-head"><span class="stat-label" th:text="#{report.slots-saved}">Slots saved</span>
+                <span class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-sparkle"/></svg></span></div>
+            <div class="stat-value" th:text="${t.slotsSaved()}">6</div>
+            <div class="stat-sub" th:text="#{report.refilled(${t.refilled() + ''})}">Rebooked: 4</div>
+        </div>
+        <div class="stat tone-warn">
+            <div class="stat-head"><span class="stat-label" th:text="#{report.no-shows}">No-shows</span>
+                <span class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-user-x"/></svg></span></div>
+            <div class="stat-value" th:text="${t.noShows()}">3</div>
+            <div class="stat-sub" th:text="${t.noShowPercent() != null} ? #{report.no-show-rate(${t.noShowPercent() + ''})} : ''">5% of appointments due</div>
+        </div>
+        <div class="stat">
+            <div class="stat-head"><span class="stat-label" th:text="#{report.confirmed}">Confirmed by the patient</span>
+                <span class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-check-circle"/></svg></span></div>
+            <div class="stat-value" th:text="${t.confirmed()}">41</div>
+            <div class="stat-sub" th:text="#{report.reminders-sent(${t.remindersSent() + ''})}">Reminders sent: 96</div>
+        </div>
+        <div class="stat tone-whatsapp">
+            <div class="stat-head"><span class="stat-label" th:text="#{report.on-whatsapp}">Booked on WhatsApp</span>
+                <span class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-chat"/></svg></span></div>
+            <div class="stat-value" th:text="${t.bookedOnWhatsApp()}">22</div>
+            <div class="stat-sub" th:text="#{report.of-appointments(${t.appointments() + ''})}">of 64 appointments</div>
+        </div>
+    </div>
+
+    <div class="report-grid">
+        <section class="card">
+            <div class="section-head"><h2 th:text="#{report.appointments}">Appointments</h2></div>
+            <p class="muted" th:if="${t.appointments() == 0}" th:text="#{report.empty}">No appointments this month.</p>
+            <dl class="report-rows" th:unless="${t.appointments() == 0}">
+                <div class="total"><dt th:text="#{report.row.appointments}">Appointments</dt><dd th:text="${t.appointments()}">64</dd></div>
+                <div><dt th:text="#{report.row.arrived}">Arrived</dt><dd th:text="${t.arrived()}">48</dd></div>
+                <div><dt th:text="#{report.row.no-shows}">No-shows</dt><dd th:text="${t.noShows()}">3</dd></div>
+                <div class="good"><dt th:text="#{report.row.slots-saved}">Cancelled on WhatsApp at least 2 hours ahead</dt>
+                    <dd th:text="${t.slotsSaved()}">6</dd></div>
+                <div class="sub"><dt th:text="#{report.row.refilled}">… rebooked by someone else</dt><dd th:text="${t.refilled()}">4</dd></div>
+                <div><dt th:text="#{report.row.late}">Cancelled by the patient less than 2 hours ahead</dt><dd th:text="${t.lateCancellations()}">1</dd></div>
+                <div><dt th:text="#{report.row.by-clinic}">Cancelled by the clinic</dt><dd th:text="${t.cancelledByClinic()}">2</dd></div>
+                <div><dt th:text="#{report.row.upcoming}">Still to come</dt><dd th:text="${t.upcoming()}">4</dd></div>
+                <div th:classappend="${t.unmarked() > 0} ? 'attention'"><dt>
+                        <span th:text="#{report.row.unmarked}">Not marked arrived or no-show</span>
+                        <span class="hint" th:if="${t.unmarked() > 0}" th:text="#{report.unmarked.hint}">Mark them on Today.</span></dt>
+                    <dd th:text="${t.unmarked()}">0</dd></div>
+            </dl>
+        </section>
+
+        <!--/* Which hours fill up and which stay empty (BusyHours). */-->
+        <section class="card busy-card">
+            <div class="section-head"><h2 th:text="#{report.busy}">Busy hours</h2></div>
+            <p class="muted" th:if="${busy.days().isEmpty()}" th:text="#{report.busy.none}">No opening hours this month.</p>
+            <th:block th:unless="${busy.days().isEmpty()}">
+                <p class="busy-insight" th:if="${busy.busiest() != null}">
+                    <span><span class="busy-dot busy-dot-full"></span><span th:text="#{report.busy.busiest(${busy.busiest()})}">Fullest: Tuesday 10 AM (100%)</span></span>
+                    <span><span class="busy-dot busy-dot-empty"></span><span th:text="#{report.busy.quietest(${busy.quietest()})}">Emptiest: Saturday 12 PM (0%)</span></span>
+                </p>
+                <div class="busy-scroll">
+                    <table class="busy-grid">
+                        <thead><tr><th scope="col"></th>
+                            <th scope="col" th:each="h : ${busy.hours()}" th:text="${h}">9 AM</th></tr></thead>
+                        <tbody>
+                            <tr th:each="d : ${busy.days()}">
+                                <th scope="row" th:text="${d.day()}">Monday</th>
+                                <td th:each="c : ${d.cells()}" th:class="'busy-' + ${c.level()}" th:title="${c.title()}">
+                                    <span class="sr-only" th:text="${c.title()}">Monday 9 AM: 7 of 8 booked (88%)</span>
+                                    <span aria-hidden="true" th:text="${c.percent()}">88%</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="busy-legend" aria-hidden="true">
+                    <span><i class="busy-empty"></i><th:block th:text="#{report.busy.legend.empty}">Empty</th:block></span>
+                    <span><i class="busy-quiet"></i><th:block th:text="#{report.busy.legend.quiet}">Quiet</th:block></span>
+                    <span><i class="busy-half"></i><th:block th:text="#{report.busy.legend.half}">Half full</th:block></span>
+                    <span><i class="busy-busy"></i><th:block th:text="#{report.busy.legend.busy}">Busy</th:block></span>
+                    <span><i class="busy-full"></i><th:block th:text="#{report.busy.legend.full}">Full</th:block></span>
+                    <span><i class="busy-outside"></i><th:block th:text="#{report.busy.legend.outside}">Outside the hours</th:block></span>
+                </div>
+                <p class="hint" th:text="#{report.busy.hint}">Booked appointments out of the slots the doctors' hours offered.</p>
+            </th:block>
+        </section>
+    </div>
+
+    <section class="card" th:if="${multipleDoctors}">
+        <div class="section-head"><h2 th:text="#{report.by-doctor}">By doctor</h2></div>
+        <div class="table-scroll">
+            <table class="data-table report-table">
+                <thead><tr>
+                    <th scope="col" th:text="#{report.doctor}">Doctor</th>
+                    <th scope="col" class="num" th:text="#{report.col.appointments}">Appointments</th>
+                    <th scope="col" class="num" th:text="#{report.col.on-whatsapp}">On WhatsApp</th>
+                    <th scope="col" class="num" th:text="#{report.col.confirmed}">Confirmed</th>
+                    <th scope="col" class="num" th:text="#{report.col.arrived}">Arrived</th>
+                    <th scope="col" class="num" th:text="#{report.col.no-shows}">No-shows</th>
+                    <th scope="col" class="num" th:text="#{report.col.slots-saved}">Slots saved</th>
+                    <th scope="col" class="num" th:text="#{report.col.by-clinic}">Cancelled by clinic</th>
+                </tr></thead>
+                <tbody>
+                    <tr th:each="d : ${report.doctors()}" th:with="f=${d.figures()}">
+                        <th scope="row" th:text="${d.doctor()}">Dr. Khoury</th>
+                        <td class="num" th:attr="data-label=#{report.col.appointments}" th:text="${f.appointments()}">40</td>
+                        <td class="num" th:attr="data-label=#{report.col.on-whatsapp}" th:text="${f.bookedOnWhatsApp()}">12</td>
+                        <td class="num" th:attr="data-label=#{report.col.confirmed}" th:text="${f.confirmed()}">25</td>
+                        <td class="num" th:attr="data-label=#{report.col.arrived}" th:text="${f.arrived()}">30</td>
+                        <td class="num" th:attr="data-label=#{report.col.no-shows}" th:text="${f.noShows()}">2</td>
+                        <td class="num" th:attr="data-label=#{report.col.slots-saved}" th:text="${f.slotsSaved()}">4</td>
+                        <td class="num" th:attr="data-label=#{report.col.by-clinic}" th:text="${f.cancelledByClinic()}">1</td>
+                    </tr>
+                    <tr class="total-row">
+                        <th scope="row" th:text="#{report.all-doctors}">All doctors</th>
+                        <td class="num" th:attr="data-label=#{report.col.appointments}" th:text="${t.appointments()}">64</td>
+                        <td class="num" th:attr="data-label=#{report.col.on-whatsapp}" th:text="${t.bookedOnWhatsApp()}">22</td>
+                        <td class="num" th:attr="data-label=#{report.col.confirmed}" th:text="${t.confirmed()}">41</td>
+                        <td class="num" th:attr="data-label=#{report.col.arrived}" th:text="${t.arrived()}">48</td>
+                        <td class="num" th:attr="data-label=#{report.col.no-shows}" th:text="${t.noShows()}">3</td>
+                        <td class="num" th:attr="data-label=#{report.col.slots-saved}" th:text="${t.slotsSaved()}">6</td>
+                        <td class="num" th:attr="data-label=#{report.col.by-clinic}" th:text="${t.cancelledByClinic()}">2</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+    </th:block>
+
+    <!--/* The clinic's messages: not for a doctor's own login. */-->
+    <section class="card" th:if="${staff.doctorId() == null}">
+        <div class="section-head">
+            <h2 th:text="#{report.messages}">WhatsApp messages</h2>
+            <span class="report-cost"><span class="muted" th:text="#{report.estimated-cost}">Estimated cost</span>
+                <strong th:text="${totalCost}">$4.12</strong></span>
+        </div>
+        <p class="muted" th:if="${messageRows.isEmpty()}" th:text="#{report.messages.none}">No messages sent this month.</p>
+        <div class="table-scroll" th:unless="${messageRows.isEmpty()}">
+            <table class="data-table report-table">
+                <thead><tr>
+                    <th scope="col" th:text="#{report.col.category}">Category</th>
+                    <th scope="col" class="num" th:text="#{report.col.sent}">Sent</th>
+                    <th scope="col" class="num" th:text="#{report.col.failed}">Failed</th>
+                    <th scope="col" class="num" th:text="#{report.col.cost}">Estimated cost</th>
+                </tr></thead>
+                <tbody>
+                    <tr th:each="m : ${messageRows}">
+                        <th scope="row" th:text="${m.category()}">Utility</th>
+                        <td class="num" th:attr="data-label=#{report.col.sent}" th:text="${m.sent()}">96</td>
+                        <td class="num" th:attr="data-label=#{report.col.failed}" th:text="${m.failed()}">1</td>
+                        <td class="num" th:attr="data-label=#{report.col.cost}" th:text="${m.cost()}">$3.10</td>
+                    </tr>
+                    <tr class="total-row">
+                        <th scope="row" th:text="#{report.total}">Total</th>
+                        <td class="num" th:attr="data-label=#{report.col.sent}" th:text="${report.messagesSent()}">140</td>
+                        <td class="num" th:attr="data-label=#{report.col.failed}" th:text="${report.messagesFailed()}">1</td>
+                        <td class="num" th:attr="data-label=#{report.col.cost}" th:text="${totalCost}">$4.12</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="hint" th:if="${report.messagesUnpriced() > 0}" th:text="#{report.unpriced(${report.messagesUnpriced() + ''})}">
+            Messages without an estimate: 12.</p>
+        <p class="hint" th:text="#{report.cost.note}">Estimates from Meta's rates, before any free messages or discounts.</p>
+    </section>
+</main>
+</body>
+</html>

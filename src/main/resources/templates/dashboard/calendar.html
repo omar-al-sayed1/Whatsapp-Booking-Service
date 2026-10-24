@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{dashboard/layout :: page(~{::title}, 'calendar', ~{::main})}">
+<head><title th:text="#{calendar.title}">Your appointment</title></head>
+<body>
+<!--/*
+  A patient's "Add to my calendar" page, opened from WhatsApp without logging in. The clinic, the
+  doctor and the time; never the patient. In the patient's language (CalendarPageController).
+*/-->
+<main class="public-page">
+    <article class="cal-card">
+        <header class="cal-head">
+            <span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="#i-calendar-plus"/></svg></span>
+            <div>
+                <span class="eyebrow" th:text="#{calendar.title}">Your appointment</span>
+                <h1 th:text="${details.clinic()}">Dr. Demo</h1>
+            </div>
+        </header>
+
+        <dl class="cal-details">
+            <div><dt th:text="#{calendar.doctor}">Doctor</dt><dd th:text="${details.doctor()}">Dr. Khoury</dd></div>
+            <div><dt th:text="#{calendar.when}">When</dt>
+                <dd><strong th:text="${details.date()}">Thursday 15 October</strong>
+                    <span class="cal-time" th:text="${details.time()}">10:30 AM</span></dd></div>
+            <div th:if="${details.address() != null and !#strings.isEmpty(details.address())}">
+                <dt th:text="#{calendar.where}">Where</dt><dd th:text="${details.address()}" dir="auto">Main street, Zahle</dd></div>
+        </dl>
+
+        <p class="cal-status cancelled" th:if="${details.cancelled()}">
+            <svg class="icon" aria-hidden="true"><use href="#i-ban"/></svg><span th:text="#{calendar.cancelled}">This appointment was cancelled.</span></p>
+        <p class="cal-status" th:if="${!details.cancelled() and details.past()}">
+            <svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg><span th:text="#{calendar.past}">This appointment has passed.</span></p>
+
+        <div class="cal-actions" th:if="${!details.cancelled() and !details.past()}">
+            <a class="button primary" th:href="${details.calendarFile()}">
+                <svg class="icon" aria-hidden="true"><use href="#i-calendar-plus"/></svg><span th:text="#{calendar.add}">Add to my calendar</span></a>
+            <span class="hint" th:text="#{calendar.add.hint}">For the iPhone calendar, Outlook and most phones.</span>
+            <a class="button" th:href="${details.googleCalendar()}" target="_blank" rel="noopener noreferrer">
+                <svg class="icon" aria-hidden="true"><use href="#i-today"/></svg><span th:text="#{calendar.google}">Google Calendar</span></a>
+        </div>
+
+        <p class="cal-note">
+            <svg class="icon" aria-hidden="true"><use href="#i-chat"/></svg><span th:text="#{calendar.change}">To cancel or change it, message the clinic on WhatsApp.</span></p>
+    </article>
+</main>
+</body>
+</html>
