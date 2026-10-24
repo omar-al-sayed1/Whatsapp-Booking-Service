@@ -191,20 +191,3 @@ Packages by feature under `app.clinicreminders`:
 | `common` | Shared bits: languages, phone numbers, configuration |
 
 Database migrations are in `src/main/resources/db/migration` (Flyway).
-
-## Rules that matter
-
-These come from [CLAUDE.md](CLAUDE.md), which has the full list.
-
-- **Multi-tenancy:** every clinic-owned table has `clinic_id`, and every query filters by it.
-  `TenantRepositoryConventionTest` fails on any repository method without a `clinicId`, unless the
-  method is marked `@CrossTenant` with a reason.
-- **Privacy:** only the patient's name, phone, WhatsApp user id, language and appointment times are
-  stored. No medical notes, diagnoses or reasons for visit. Patients can be deleted on request.
-- **Time:** stored in UTC, shown in the clinic's zone. Lebanon changes clocks, and that is tested.
-- **Reminders** are sent at most once, even across restarts or with two instances running.
-- **Webhooks** are signature-checked, processed asynchronously and deduplicated.
-- **Every message** goes through one client, is logged in `message_log`, and carries a cost estimate.
-- **Migrations are append-only:** never edit one that has been applied.
-- **Every text** shown to users is in `messages_en.properties` and `messages_ar.properties`, and the
-  dashboard supports right-to-left layout.
